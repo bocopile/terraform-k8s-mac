@@ -56,6 +56,18 @@ resource "null_resource" "install_istio" {
   }
 }
 
+resource "null_resource" "install-addon" {
+  depends_on = [null_resource.install_istio]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      chmod +x ./addon/install.sh
+      ./addon/install.sh
+    EOT
+  }
+}
+
+
 resource "null_resource" "mysql_install" {
   depends_on = [null_resource.mysql_vm]
   provisioner "local-exec" {
