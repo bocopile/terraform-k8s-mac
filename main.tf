@@ -17,12 +17,14 @@ resource "null_resource" "workers" {
 }
 
 resource "null_resource" "redis_vm" {
+  depends_on = [null_resource.workers]
   provisioner "local-exec" {
     command = "multipass launch 24.04 --name redis --cpus 2 --memory 8G --disk 50G --cloud-init init/redis.yaml"
   }
 }
 
 resource "null_resource" "mysql_vm" {
+  depends_on = [null_resource.workers]
   provisioner "local-exec" {
     command = "multipass launch 24.04 --name mysql --cpus 2 --memory 8G --disk 50G --cloud-init init/mysql.yaml"
   }
