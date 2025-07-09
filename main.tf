@@ -8,6 +8,7 @@ resource "null_resource" "masters" {
 }
 
 resource "null_resource" "workers" {
+  depends_on = [null_resource.masters]
   count = var.workers
 
   provisioner "local-exec" {
@@ -28,7 +29,7 @@ resource "null_resource" "mysql_vm" {
 }
 
 resource "null_resource" "init_cluster" {
-  depends_on = [null_resource.masters]
+  depends_on = [null_resource.workers]
 
   provisioner "local-exec" {
     command = <<EOT
