@@ -1,15 +1,31 @@
 mode: deployment
-presets:
-  logsCollection:
-    enabled: true
-  kubernetesAttributes:
-    enabled: true
+
+image:
+  repository: otel/opentelemetry-collector
+  tag: "0.100.0"
+  pullPolicy: IfNotPresent
+
 config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+        http:
+
+  processors:
+    batch:
+
   exporters:
     logging:
       loglevel: debug
+
   service:
     pipelines:
-      logs:
+      traces:
         receivers: [otlp]
+        processors: [batch]
+        exporters: [logging]
+      metrics:
+        receivers: [otlp]
+        processors: [batch]
         exporters: [logging]
