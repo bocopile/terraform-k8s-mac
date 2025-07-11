@@ -1,8 +1,0 @@
-grafana:
-  enabled: true
-  sidecar:
-    dashboards:
-      enabled: true
-prometheus:
-  prometheusSpec:
-    serviceMonitorSelectorNilUsesHelmValues: false
