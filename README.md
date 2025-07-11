@@ -5,7 +5,6 @@
 ## 사전 설치 사항
 - Terraform v1.11.3 이상 : [Terraform 설치 링크](https://developer.hashicorp.com/terraform/install)
 - multipass v1.15.1+mac : [multipass 설치 링크](https://canonical.com/multipass)
-- istioctl :[istioctl 설치 링크](https://istio.io/latest/docs/ops/diagnostic-tools/istioctl/#enabling-auto-completion)
 
 
 ## 구성 요소
@@ -15,7 +14,6 @@
 | Worker Node | 6대 | 서비스 워크로드 처리 |
 | Redis VM | 1대 | Kubernetes 외부 Redis (패스워드 설정 포함) |
 | MySQL VM | 1대 | Kubernetes 외부 MySQL (DB/계정 자동 생성 포함) |
-| Istio | ✅ | 설치 및 Ingress Gateway 설정 자동화 |
 | Flannel | ✅ | Pod 간 통신을 위한 CNI 플러그인 |
 | Terraform | ✅ | 인프라 정의 및 상태 관리 |
 | Multipass | ✅ | 로컬 VM 기반 클러스터 실행 |
@@ -31,7 +29,6 @@
 ├── shell/
 │   ├── cluster-init.sh      # kubeadm init 실행
 │   ├── join-all.sh          # Master/Worker 자동 Join
-│   ├── istio-install.sh     # Istio 설치 및 Gateway 설정
 │   ├── redis-install.sh     # Redis 패스워드 설정
 │   └── mysql-install.sh     # MySQL 루트/유저/DB 설정
 ├── main.tf                  # Terraform 메인 구성
