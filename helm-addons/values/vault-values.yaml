@@ -1,0 +1,15 @@
+server:
+  ha:
+    enabled: false
+  dataStorage:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+  service:
+    type: ClusterIP
+ui:
+  enabled: true

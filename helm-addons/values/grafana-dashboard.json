@@ -1,0 +1,18 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "type": "dashboard",
+        "name": "Annotations & Alerts",
+        "enabled": true
+      }
+    ]
+  },
+  "panels": [],
+  "title": "Custom Observability Dashboard",
+  "uid": "custom-observability",
+  "version": 1,
+  "timezone": "browser",
+  "schemaVersion": 30
+}

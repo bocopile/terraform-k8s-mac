@@ -1,0 +1,9 @@
+auth:
+  strategy: anonymous
+deployment:
+  accessible_namespaces:
+    - "**"
+  image_name: quay.io/kiali/kiali
+  image_version: latest
+server:
+  web_root: /kiali

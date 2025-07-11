@@ -1,0 +1,15 @@
+mode: deployment
+presets:
+  logsCollection:
+    enabled: true
+  kubernetesAttributes:
+    enabled: true
+config:
+  exporters:
+    logging:
+      loglevel: debug
+  service:
+    pipelines:
+      logs:
+        receivers: [otlp]
+        exporters: [logging]

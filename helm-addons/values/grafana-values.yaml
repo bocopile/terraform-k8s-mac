@@ -1,0 +1,13 @@
+grafana:
+  service:
+    type: LoadBalancer
+  adminPassword: admin
+  dashboards:
+    default:
+      custom:
+        file: /var/lib/grafana/dashboards/custom-dashboard.json
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL

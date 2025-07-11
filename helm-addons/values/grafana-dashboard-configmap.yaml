@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-grafana-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  custom-dashboard.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "type": "dashboard",
+            "name": "Annotations & Alerts",
+            "enabled": true
+          }
+        ]
+      },
+      "panels": [],
+      "title": "Custom Observability Dashboard",
+      "uid": "custom-observability",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 30
+    }

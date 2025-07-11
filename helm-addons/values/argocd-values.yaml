@@ -1,0 +1,9 @@
+server:
+  service:
+    type: LoadBalancer
+controller:
+  replicas: 1
+repoServer:
+  replicas: 1
+dex:
+  enabled: false
