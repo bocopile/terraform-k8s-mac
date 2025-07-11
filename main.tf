@@ -48,16 +48,6 @@ resource "null_resource" "join_all" {
   }
 }
 
-resource "null_resource" "install_istio" {
-  depends_on = [null_resource.join_all]
-
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass transfer ./shell/istio-install.sh k8s-master-0:/home/ubuntu/istio-install.sh
-      multipass exec k8s-master-0 -- bash -c "chmod +x /home/ubuntu/istio-install.sh && sudo bash /home/ubuntu/istio-install.sh"
-    EOT
-  }
-}
 
 resource "null_resource" "mysql_install" {
   depends_on = [null_resource.mysql_vm]
