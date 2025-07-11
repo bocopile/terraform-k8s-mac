@@ -22,7 +22,7 @@ multipass exec k8s-master-0 -- bash -c "\
   sudo cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config && \
   sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config"
 
-multipass transfer k8s-master-0:/home/ubuntu/.kube/config ~/kubeconfig
+multipass transfer k8s-master-0:/home/ubuntu/.kube/config /Users/bkshin/kubeconfig
 
-echo 'export KUBECONFIG=$HOME/kubeconfig' >> ~/.zshrc
+echo 'export KUBECONFIG=/Users/bkshin/kubeconfig' >> ~/.zshrc
 source ~/.zshrc
