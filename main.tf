@@ -51,14 +51,14 @@ resource "null_resource" "join_all" {
 resource "null_resource" "install_metallb" {
   depends_on = [null_resource.join_all]
   provisioner "local-exec" {
-    command = "bash helm-addons/values/install-metallb.sh"
+    command = "bash helm-addons/install-metallb.sh"
   }
 }
 
 resource "null_resource" "install_addon" {
   depends_on = [null_resource.install_metallb]
   provisioner "local-exec" {
-    command = "bash helm-addons/values/install-addon.sh"
+    command = "bash helm-addons/install-addons.sh"
   }
 }
 
