@@ -1,7 +1,0 @@
-collector:
-  enabled: true
-agent:
-  enabled: true
-query:
-  service:
-    type: LoadBalancer
