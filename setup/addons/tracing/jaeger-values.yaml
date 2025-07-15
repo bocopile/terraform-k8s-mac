@@ -1,0 +1,5 @@
+storage:
+  type: memory
+query:
+  service:
+    type: LoadBalancer

@@ -48,19 +48,13 @@ resource "null_resource" "join_all" {
   }
 }
 
-resource "null_resource" "install_metallb" {
-  depends_on = [null_resource.join_all]
+resource "null_resource" "join_all" {
+  depends_on = [null_resource.init_cluster]
   provisioner "local-exec" {
-    command = "bash helm-addons/install-metallb.sh"
+    command = "bash setup/install.sh"
   }
 }
 
-resource "null_resource" "install_addon" {
-  depends_on = [null_resource.install_metallb]
-  provisioner "local-exec" {
-    command = "bash helm-addons/install-addons.sh"
-  }
-}
 
 resource "null_resource" "mysql_install" {
   depends_on = [null_resource.mysql_vm]

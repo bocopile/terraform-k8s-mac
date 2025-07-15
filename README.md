@@ -5,6 +5,7 @@
 ## 사전 설치 사항
 - Terraform v1.11.3 이상 : [Terraform 설치 링크](https://developer.hashicorp.com/terraform/install)
 - multipass v1.15.1+mac : [multipass 설치 링크](https://canonical.com/multipass)
+- helmfile / helm-diff
 
 
 ## 구성 요소

@@ -1,0 +1,7 @@
+server:
+  dev:
+    enabled: true
+  service:
+    type: LoadBalancer
+ui:
+  enabled: true
