@@ -48,13 +48,6 @@ resource "null_resource" "join_all" {
   }
 }
 
-resource "null_resource" "join_all" {
-  depends_on = [null_resource.init_cluster]
-  provisioner "local-exec" {
-    command = "bash setup/install.sh"
-  }
-}
-
 
 resource "null_resource" "mysql_install" {
   depends_on = [null_resource.mysql_vm]
@@ -87,7 +80,7 @@ resource "null_resource" "cleanup" {
     command = <<EOT
       echo "Deleting all multipass VMs..."
       for name in $(multipass list | awk 'NR>1 {print $1}'); do
-        multipass delete --purge $name || true
+       --purge $ multipass delete name || true
       done
     EOT
   }
