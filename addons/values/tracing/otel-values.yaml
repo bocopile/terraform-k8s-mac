@@ -1,0 +1,38 @@
+image:
+  repository: otel/opentelemetry-collector
+  tag: 0.100.0
+
+config:
+  exporters:
+    jaeger:
+      endpoint: jaeger-collector.tracing.svc.cluster.local:14250
+      tls:
+        insecure: true
+  receivers:
+    otlp:
+      protocols:
+        grpc: null
+        http: null
+  service:
+    telemetry:
+      metrics:
+        readers:
+          - endpoint: "0.0.0.0:8888"
+  pipelines:
+    traces:
+      exporters:
+        - jaeger
+      receivers:
+        - otlp
+
+mode: deployment
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+useGOMEMLIMIT: true

@@ -1,0 +1,9 @@
+configs:
+  secret:
+    argocdServerAdminPassword: $2a$12$EXAMPLE_HASHED_PASSWORD
+
+server:
+  ingress:
+    enabled: false
+  service:
+    type: LoadBalancer
