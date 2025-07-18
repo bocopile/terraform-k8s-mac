@@ -78,10 +78,8 @@ resource "null_resource" "cleanup" {
   provisioner "local-exec" {
     when    = destroy
     command = <<EOT
-      echo "Deleting all multipass VMs..."
-      for name in $(multipass list | awk 'NR>1 {print $1}'); do
-       --purge $ multipass delete name || true
-      done
+      multipass delete --all
+      multipass purge
     EOT
   }
 }
