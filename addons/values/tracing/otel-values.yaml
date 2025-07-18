@@ -1,31 +1,52 @@
 image:
-  repository: otel/opentelemetry-collector
-  tag: 0.100.0
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.91.0
+
+mode: deployment
 
 config:
-  exporters:
-    jaeger:
-      endpoint: jaeger-collector.tracing.svc.cluster.local:14250
-      tls:
-        insecure: true
   receivers:
     otlp:
       protocols:
-        grpc: null
-        http: null
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: 'otel-self'
+            static_configs:
+              - targets: ['localhost:8888']
+
+  exporters:
+    otlp:
+      endpoint: jaeger-collector.tracing.svc.cluster.local:14250
+      tls:
+        insecure: true
+
+    debug: {}  # logging → debug 대체
+
+  processors:
+    batch: {}
+
   service:
     telemetry:
+      logs:
+        level: info
       metrics:
-        readers:
-          - endpoint: "0.0.0.0:8888"
-  pipelines:
-    traces:
-      exporters:
-        - jaeger
-      receivers:
-        - otlp
+        address: ":8888"  # 내부 메트릭 노출 (→ extraPorts 로 외부 노출)
 
-mode: deployment
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [otlp]
+
+      metrics:
+        receivers: [prometheus]
+        exporters: [debug]
 
 resources:
   limits:
@@ -36,3 +57,4 @@ resources:
     memory: 256Mi
 
 useGOMEMLIMIT: true
+
