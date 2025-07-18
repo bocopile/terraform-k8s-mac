@@ -40,15 +40,31 @@
 ## 설치 방법
 ### 1. 초기화 및 배포
 ```bash
-terraform init
+terraform init && terraform plan
 terraform apply -auto-approve
 ```
 
-### 2. 삭제
+### 2. ip 초기화
+```bash
+# 
+cd addons
+chmod +x install.sh
+./install.sh
+```
+
+### 3. /etc/hosts 추가
+```bash
+## addons/hosts.generated 내용을 /etc/hosts에 추가
+```
+
+
+
+### 3. 전체 삭제
 ```bash
 terraform destroy -auto-approve
 rm -rf .terraform .terraform.lock.hcl terraform.tfstate* kubeconfig
 ```
+
 
 
 ## 🔐 Redis/MySQL 접속 정보 (예시)

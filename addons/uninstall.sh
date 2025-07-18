@@ -23,12 +23,12 @@ kubectl delete ns istio-system istio-ingress argocd monitoring logging tracing v
 
 # Clean /etc/hosts entries added by install.sh
 DOMAINS=(
- "argocd.bocopile.io 192.168.64.240"
- "grafana.bocopile.io 192.168.64.241"
- "jaeger.bocopile.io 192.168.64.242"
- "kiali.bocopile.io 192.168.64.243"
- "otel.bocopile.io 192.168.64.244"
- "vault.bocopile.io 192.168.64.245"
+ "argocd.bocopile.io"
+ "grafana.bocopile.io"
+ "jaeger.bocopile.io"
+ "kiali.bocopile.io"
+ "otel.bocopile.io"
+ "vault.bocopile.io"
 )
 
 echo "Cleaning up /etc/hosts entries..."
