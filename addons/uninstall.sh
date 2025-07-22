@@ -14,6 +14,7 @@ helm uninstall istiod -n istio-system
 helm uninstall istio-base -n istio-system
 helm uninstall vault -n vault
 helm uninstall metallb -n metallb-system
+helm uninstall my-local-path-provisioner -n  local-path-storage
 
 echo "✅ Helm Release 삭제 완료"
 

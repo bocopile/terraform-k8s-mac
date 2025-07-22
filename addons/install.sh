@@ -8,9 +8,12 @@ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm
 helm repo add kiali https://kiali.org/helm-charts
 helm repo add hashicorp https://helm.releases.hashicorp.com
 helm repo add metallb https://metallb.github.io/metallb
+helm repo add containeroo https://charts.containeroo.ch
 helm repo update
 
 
+# 로컬 동적 프로바이더
+helm upgrade --install my-local-path-provisioner containeroo/local-path-provisioner --version 0.0.22 -n local-path-storage --create-namespace --values values/rancher/local-path.yaml
 # Istio
 helm upgrade --install istio-base istio/base -n istio-system --create-namespace -f values/istio/istio-values.yaml
 helm upgrade --install istiod istio/istiod -n istio-system -f values/istio/istio-values.yaml
