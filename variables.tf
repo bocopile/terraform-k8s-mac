@@ -38,15 +38,15 @@ variable "mysql_root_password" {
 }
 
 variable "mysql_user" {
-  default = "devuser"
+  default = "finalyzer"
 }
 
 variable "mysql_user_password" {
   type      = string
   sensitive = true
-  default   = "devpass"
+  default   = "finalyzerpass"
 }
 
 variable "mysql_database" {
-  default = "devdb"
+  default = "finalyzer"
 }
