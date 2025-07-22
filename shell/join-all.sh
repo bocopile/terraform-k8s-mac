@@ -26,3 +26,6 @@ multipass transfer k8s-master-0:/home/ubuntu/.kube/config /Users/bkshin/kubeconf
 
 echo 'export KUBECONFIG=/Users/bkshin/kubeconfig' >> ~/.zshrc
 source ~/.zshrc
+
+rm -rf ./shell/join-controlplane.sh
+rm -rf ./shell/join.sh
