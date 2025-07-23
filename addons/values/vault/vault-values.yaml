@@ -3,5 +3,7 @@ server:
     enabled: true
   service:
     type: LoadBalancer
+    annotations:
+      external-dns.alpha.kubernetes.io/hostname: vault.bocopile.io
 ui:
   enabled: true

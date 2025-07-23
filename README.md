@@ -44,26 +44,13 @@ terraform init && terraform plan
 terraform apply -auto-approve
 ```
 
-### 2. addon 추가
-```bash
-cd addon
-chmod +x install.sh
-./install.sh
-```
-
-### 3. /etc/hosts 추가
-```bash
-## addons/hosts.generated 내용을 /etc/hosts에 추가
-sudo cp hosts.generated /etc/hosts
-```
-
-### 4. 전체 삭제
+### 2. 전체 삭제
 ```bash
 terraform destroy -auto-approve
 rm -rf .terraform .terraform.lock.hcl terraform.tfstate* kubeconfig
 ```
 
-## 🔐 Redis/MySQL 접속 정보 (예시)
+## 🔐 Redis/MySQL 접속 정보
 
 Terraform `variables.tf` 에 정의된 기본값 기준으로 세팅
 
@@ -75,9 +62,9 @@ Terraform `variables.tf` 에 정의된 기본값 기준으로 세팅
 ### MySQL
 - Host: `mysql` VM IP
 - Port: `3306`
-- User: `devuser`
-- Password: `devpass`
-- Database: `devdb`
+- User: `finalyzer`
+- Password: `finalyzerpass`
+- Database: `finalyzer`
 
 ---
 
@@ -106,7 +93,6 @@ addon/
 ## 🚀 설치 방법
 
 ### 1. 사전 조건
-- Helm 설치 필요
 - Kubernetes 클러스터가 로컬에서 실행 중이어야 함 (multipass + kubeadm 기반)
 - `xxx.bocopile.io` 도메인에 대한 hosts 매핑 필요 (`/etc/hosts`)
 

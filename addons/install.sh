@@ -11,6 +11,10 @@ helm repo add metallb https://metallb.github.io/metallb
 helm repo add containeroo https://charts.containeroo.ch
 helm repo update
 
+# MetalLB
+helm upgrade --install metallb metallb/metallb -n metallb-system --create-namespace
+sleep 40 #Wait for metalLB
+kubectl apply -f values/metallb/metallb-config.yaml
 
 # 로컬 동적 프로바이더
 helm upgrade --install my-local-path-provisioner containeroo/local-path-provisioner --version 0.0.22 -n local-path-storage --create-namespace --values values/rancher/local-path.yaml
@@ -37,21 +41,15 @@ helm upgrade --install kiali kiali/kiali-server -n istio-system -f values/tracin
 # Vault
 helm upgrade --install vault hashicorp/vault -n vault --create-namespace -f values/vault/vault-values.yaml
 
-# MetalLB
-helm upgrade --install metallb metallb/metallb -n metallb-system --create-namespace
-sleep 20 #Wait for metalLB
-kubectl apply -f values/metallb/metallb-config.yaml
-
-
 # --- LoadBalancer IP to /etc/hosts mapping ---
 echo "[INFO] Waiting for LoadBalancer IPs to be assigned..."
-sleep 20  # Wait for IPs to be assigned
+#sleep 60  # Wait for IPs to be assigned
 
 HOSTS_FILE="./hosts.generated"
 echo "" > "$HOSTS_FILE"
 
 # DOMAIN:SERVICE.NAMESPACE
-SERVICE_MAP="argocd.bocopile.io:argocd-server.argocd grafana.bocopile.io:kube-prometheus-stack-grafana.monitoring jaeger.bocopile.io:jaeger-query.tracing kiali.bocopile.io:kiali.istio-system "
+SERVICE_MAP="argocd.bocopile.io:argocd-server.argocd grafana.bocopile.io:kube-prometheus-stack-grafana.monitoring jaeger.bocopile.io:jaeger-query.tracing kiali.bocopile.io:kiali.istio-system vault.bocopile.io:vault.vault "
 
 for entry in $SERVICE_MAP; do
   domain=${entry%%:*}

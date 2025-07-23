@@ -78,8 +78,7 @@ resource "null_resource" "cleanup" {
   provisioner "local-exec" {
     when    = destroy
     command = <<EOT
-      multipass delete --all
-      multipass purge
+      multipass delete --all && multipass purge
     EOT
   }
 }
