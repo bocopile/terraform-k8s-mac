@@ -30,8 +30,8 @@ helm upgrade --install argocd argo/argo-cd -n argocd --create-namespace -f value
 helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f values/monitoring/monitoring-values.yaml
 
 # Logging
-helm upgrade --install loki grafana/loki-stack -n logging --create-namespace -f values/logging/loki-values.yaml
-helm upgrade --install promtail grafana/promtail -n logging --create-namespace -f values/logging/promtail-values.yaml
+helm upgrade --install loki grafana/loki-stack -n monitoring -f values/logging/loki-values.yaml
+helm upgrade --install promtail grafana/promtail-n monitoring -f values/logging/promtail-values.yaml
 
 # Tracing
 helm upgrade --install jaeger jaegertracing/jaeger -n tracing --create-namespace -f values/tracing/jaeger-values.yaml

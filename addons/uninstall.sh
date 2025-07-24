@@ -5,8 +5,8 @@ echo "🗑️  Helm Release 삭제 시작..."
 helm uninstall kiali -n istio-system
 helm uninstall otel -n tracing
 helm uninstall jaeger -n tracing
-helm uninstall promtail -n logging
-helm uninstall loki -n logging
+helm uninstall promtail -n monitoring
+helm uninstall loki -n monitoring
 helm uninstall kube-prometheus-stack -n monitoring
 helm uninstall argocd -n argocd
 helm uninstall istio-ingress -n istio-ingress

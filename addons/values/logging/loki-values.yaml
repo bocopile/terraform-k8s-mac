@@ -10,6 +10,9 @@ storage:
   type: filesystem
 
 loki:
+  image:
+    repository: grafana/loki
+    tag: 2.9.5
   persistence:
     enabled: true
     accessModes:
