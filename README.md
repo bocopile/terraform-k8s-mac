@@ -100,7 +100,12 @@ addon/
 
 ```bash
 cd addon
-./install.sh
+# on 모드 + /etc/hosts 자동 병합
+
+sudo APPLY_HOSTS=1 bash install.sh ~/kubeconfig
+
+# off 모드 + /etc/hosts 자동 병합
+sudo ISTIO_EXPOSE=off APPLY_HOSTS=1 bash install.sh ~/kubeconfig
 ```
 
 > Istio →  ArgoCD → Vault → Monitoring → Logging → Tracing → MetalLB 순으로 설치됩니다.  

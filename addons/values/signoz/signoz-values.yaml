@@ -1,0 +1,72 @@
+global:
+  clusterName: local-multipass
+  clickhouse:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: local-path
+
+otelCollector:
+  gateway:
+    enabled: true
+    service:
+      type: ClusterIP
+      ports:
+        otlpGrpc: 4317
+        otlpHttp: 4318
+    config:
+      receivers:
+        otlp:
+          protocols:
+            grpc: {}
+            http: {}
+      processors:
+        batch: {}
+      exporters:
+        clickhouse:
+          endpoint: tcp://signoz-clickhouse:9000?dial_timeout=10s&compress=true
+          database: signoz
+          ttl_days: 15
+      service:
+        pipelines:
+          traces:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [clickhouse]
+          metrics:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [clickhouse]
+          logs:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [clickhouse]
+
+  agent:
+    enabled: true
+    # We primarily use Fluent Bit for logs; agent will scrape host/node/pod metrics if needed
+    extraEnvs:
+      - name: SIG_NOZ_CLUSTER
+        value: local-multipass
+
+frontend:
+  service:
+    type: ClusterIP
+
+ingress:
+  enabled: false  # we expose via Istio below
+
+clickhouse:
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+retentionPeriod:
+  metrics: 15d
+  traces: 15d
+  logs: 7d

@@ -1,0 +1,36 @@
+tolerations:
+  - operator: Exists
+
+serviceAccount:
+  create: true
+
+inputs:
+  tail:
+    enabled: true
+    path: /var/log/containers/*.log
+    parser: docker
+    memBufLimit: 50MB
+    skipLongLines: true
+    refreshInterval: 5
+    multiline:
+      enabled: true
+
+outputs:
+  otlp:
+    enabled: true
+    host: signoz-otel-collector
+    port: 4318
+    tls:
+      enabled: false
+    # attribute mapping to resource
+    logAttributes:
+      k8s.cluster.name: local-multipass
+
+filters:
+  kubernetes:
+    enabled: true
+    kubeURL: https://kubernetes.default.svc:443
+    mergeLog: true
+    keepLog: true
+    labels: true
+    annotations: true
