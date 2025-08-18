@@ -50,3 +50,20 @@ variable "mysql_user_password" {
 variable "mysql_database" {
   default = "finalyzer"
 }
+
+variable "harbor_server" {
+  type        = string
+  default     = "harbor.bocopile.io:5000"
+  description = "Registry host:port"
+}
+
+variable "harbor_user" {
+  type        = string
+  default     = "devops"
+}
+
+variable "harbor_password" {
+  type        = string
+  sensitive   = true
+  default     = "P@ssw0rd!"
+}

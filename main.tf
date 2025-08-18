@@ -122,23 +122,42 @@ resource "null_resource" "redis_install" {
   }
 }
 
-# Harbor
 resource "null_resource" "registry_install" {
   depends_on = [null_resource.vm_registry]
 
   triggers = {
     compose_sha = filesha1("${path.module}/compose/harbor/docker-compose.yml")
+    # vm_bootstrap.sh 실제 위치가 scripts/ 라면 아래로 통일
     script_sha  = filesha1("${path.module}/scripts/vm_bootstrap.sh")
+    user_sha    = var.harbor_user
+    pass_sha    = sha1(var.harbor_password)
+    host_sha    = var.harbor_server
   }
 
   provisioner "local-exec" {
     command = <<EOT
       multipass transfer ${path.module}/compose/harbor/docker-compose.yml vm-registry:/opt/harbor/docker-compose.yml
       multipass transfer ${path.module}/scripts/vm_bootstrap.sh vm-registry:/tmp/vm_bootstrap.sh
-      multipass exec vm-registry -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry'
+      multipass exec vm-registry -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
+
+      multipass exec vm-registry -- bash -lc "sudo mkdir -p /data/registry/auth"
+      multipass exec vm-registry -- bash -lc "sudo docker run --rm --entrypoint htpasswd httpd:2 -Bbn '${var.harbor_user}' '${var.harbor_password}' | sudo tee /data/registry/auth/htpasswd >/dev/null"
+      multipass exec vm-registry -- bash -lc "sudo chown root:root /data/registry/auth/htpasswd && sudo chmod 640 /data/registry/auth/htpasswd"
+
+      multipass exec vm-registry -- bash -lc 'sudo mkdir -p /etc/docker'
+      multipass exec vm-registry -- bash -lc "cat <<'JSON' | sudo tee /etc/docker/daemon.json
+{
+  \"insecure-registries\": [\"${var.harbor_server}\"]
+}
+JSON"
+      multipass exec vm-registry -- bash -lc 'sudo systemctl restart docker || true'
+
+      # compose 기동 (데이터 디렉토리 포함)
+      multipass exec vm-registry -- bash -lc '/tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry /data/registry/auth'
     EOT
   }
 }
+
 
 # Nexus
 resource "null_resource" "nexus_install" {

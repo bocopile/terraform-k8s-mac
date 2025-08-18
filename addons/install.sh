@@ -23,8 +23,11 @@ INGRESS_NS="istio-ingress"
 OBS_NS="observability"
 ARGO_NS="argocd"
 VAULT_NS="vault"
+METALLB_NS="metallb-system"
+LOCALPATH_NS="local-path-storage"
+TRIVY_NS="trivy-system"
 
-# 도메인 목록
+# 도메인 목록 (※ Trivy는 외부 노출 대상이 아니므로 제외)
 DOMAINS=("signoz.bocopile.io" "argocd.bocopile.io" "kiali.bocopile.io" "vault.bocopile.io")
 DOMAINS_REGEX='(signoz\.bocopile\.io|argocd\.bocopile\.io|kiali\.bocopile\.io|vault\.bocopile\.io)'
 HOSTS_FILE="hosts.generated"
@@ -133,9 +136,26 @@ kubectl get ns "$OBS_NS" >/dev/null 2>&1 || kubectl create ns "$OBS_NS"
 helm upgrade --install signoz signoz/signoz -n "$OBS_NS" \
   --set frontend.service.type=ClusterIP || true
 
-### 5) off 모드면 각 서비스 LB로 노출 패치
+### 5) Trivy Operator 설치/업그레이드 (Helm; 기존 values 사용)
+TRIVY_INSECURE="${TRIVY_INSECURE:-true}"           # 미정 환경변수 방어용 기본값
+TRIVY_USE_VALUES_CREDS="${TRIVY_USE_VALUES_CREDS:-0}" # 참고용(현재는 기존 values만 사용)
+
+echo "[5] Trivy Operator 설치/업그레이드"
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+TRIVY_VALUES_FILE="${REPO_ROOT}/values/trivy/trivy-values.yaml"
+
+helm repo add aqua https://aquasecurity.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo update >/dev/null
+kubectl get ns "$TRIVY_NS" >/dev/null 2>&1 || kubectl create ns "$TRIVY_NS"
+
+helm upgrade --install trivy-operator aqua/trivy-operator \
+  -n "$TRIVY_NS" --create-namespace \
+  -f "$TRIVY_VALUES_FILE"
+
+### 6) off 모드면 각 서비스 LB로 노출 패치
 if [[ "$ISTIO_EXPOSE" == "off" ]]; then
-  echo "[5] off 모드: 서비스별 LoadBalancer 패치"
+  echo "[6] off 모드: 서비스별 LoadBalancer 패치"
   kubectl -n "$ARGO_NS"  patch svc argocd-server -p '{"spec":{"type":"LoadBalancer"}}'
   kubectl -n "$VAULT_NS" patch svc vault         -p '{"spec":{"type":"LoadBalancer"}}'
   # SigNoz 프론트 서비스명 자동 선택
@@ -146,9 +166,9 @@ if [[ "$ISTIO_EXPOSE" == "off" ]]; then
   fi
 fi
 
-### 6) on 모드면 Gateway/VirtualService 자동 생성
+### 7) on 모드면 Gateway/VirtualService 자동 생성
 if [[ "$ISTIO_EXPOSE" == "on" ]]; then
-  echo "[6] on 모드: Gateway/VirtualService 생성"
+  echo "[7] on 모드: Gateway/VirtualService 생성"
 
   # 셀렉터(기본: istio=ingressgateway)
   SEL_KEY="istio"; SEL_VAL="ingressgateway"
@@ -212,8 +232,8 @@ EOF
   apply_vs "$VAULT_NS" "vault.bocopile.io" "vault.${VAULT_NS}.svc.cluster.local" 8200 "vault"
 fi
 
-### 7) hosts.generated 작성
-echo "[7] hosts.generated 생성"
+### 8) hosts.generated 작성
+echo "[8] hosts.generated 생성"
 : > "$HOSTS_FILE"
 if [[ "$ISTIO_EXPOSE" == "on" ]]; then
   ADDR="$(wait_svc_addr "$INGRESS_NS" "$IGW_SVC" 180 || true)"
@@ -233,16 +253,18 @@ else
     SIGNOZ_SVC_NAME="signoz"
   fi
   SIGNOZ_IP="$(wait_svc_addr "$OBS_NS" "$SIGNOZ_SVC_NAME" 120 || true)"
+
   echo "${ARGO_IP:-127.0.0.1}  argocd.bocopile.io"  >> "$HOSTS_FILE"
   echo "${VAULT_IP:-127.0.0.1} vault.bocopile.io"   >> "$HOSTS_FILE"
   echo "${SIGNOZ_IP:-127.0.0.1} signoz.bocopile.io" >> "$HOSTS_FILE"
+
   echo "[INFO] 생성된 hosts:"
   cat "$HOSTS_FILE"
 fi
 
-### 8) /etc/hosts 안전 병합
+### 9) /etc/hosts 안전 병합
 if [[ "$APPLY_HOSTS" == "1" ]]; then
-  echo "[8] /etc/hosts 병합 (안전)"
+  echo "[9] /etc/hosts 병합 (안전)"
   merge_hosts "$HOSTS_FILE"
 else
   echo "[INFO] /etc/hosts에 병합하려면: sudo APPLY_HOSTS=1 bash $0 ${KUBECONFIG_PATH}"

@@ -1,0 +1,46 @@
+# namespace는 설치 시 -n trivy-system --create-namespace 로 지정
+trivy:
+  # 내 Harbor가 HTTP 또는 사설 인증서라면 ↓옵션 켜기
+  insecure: true
+  ignoreUnfixed: true
+  severity: "HIGH,CRITICAL"
+  # 이미지 스캔 모드: 기본(built-in) 서버로 빠르게
+  dbRepository: ghcr.io/aquasecurity/trivy-db
+  javaDbRepository: ghcr.io/aquasecurity/trivy-java-db
+  # Private registry 인증이 필요하면 아래 주석 해제 후 Secret 참조
+  registry:
+    credentials:
+    - server: "harbor.bocopile.io:5000"
+      username: "devops"
+      password: "P@ssw0rd!"
+
+operator:
+  # 워크로드/이미지 취약점 + 설정 감사 + 노출 비밀 탐지 활성화
+  vulnerabilityScannerEnabled: true
+  configAuditScannerEnabled: true
+  rbacAssessmentScannerEnabled: true
+  exposedSecretScannerEnabled: true
+
+  # 새로 배포되거나 변경되는 리소스 자동 스캔
+  scanJobsConcurrentLimit: 4
+  scanJobRetryAfter: 30s
+  scanJobTimeout: 5m
+
+  # 보고서 보존(기본: 최신만 유지), label/owner 기준으로 통합
+  trivySecurityReportTtl: 168h # 7일
+
+  # Node(호스트 OS 패키지) 취약점 수집 — DaemonSet 기반
+  nodeCollector:
+    enabled: true
+
+  # Metrics 노출 (Prometheus가 긁어갈 수 있게)
+  metricsFindingsEnabled: true
+
+# 리소스 기본값(필요 시 튜닝)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
