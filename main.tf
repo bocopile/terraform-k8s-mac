@@ -30,6 +30,37 @@ resource "null_resource" "mysql_vm" {
   }
 }
 
+# vm-registry.tf (Harbor)
+resource "null_resource" "vm_registry" {
+  depends_on = [null_resource.workers]
+  provisioner "local-exec" {
+    command = <<EOT
+      multipass launch --name vm-registry --cpus 4 --memory 8G --disk 100G --cloud-init ./init/registry.yaml
+    EOT
+  }
+}
+
+# vm-artifacts.tf (Nexus)
+resource "null_resource" "vm_artifacts" {
+  depends_on = [null_resource.workers]
+  provisioner "local-exec" {
+    command = <<EOT
+      multipass launch --name vm-artifacts --cpus 4 --memory 8G --disk 100G --cloud-init ./init/nexus.yaml
+    EOT
+  }
+}
+
+# vm-quality.tf (SonarQube + PG)
+resource "null_resource" "vm_quality" {
+  depends_on = [null_resource.workers]
+  provisioner "local-exec" {
+    command = <<EOT
+      multipass launch --name vm-quality --cpus 6 --memory 12G --disk 50G --cloud-init ./init/sonarqube.yaml
+    EOT
+  }
+}
+
+
 resource "null_resource" "init_cluster" {
   depends_on = [null_resource.workers]
 
@@ -48,6 +79,28 @@ resource "null_resource" "join_all" {
   }
 }
 
+
+resource "null_resource" "addon_install" {
+  depends_on = [null_resource.join_all]
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 30
+      cd ~/IdeaProjects/terraform-k8s-mac/addons
+      bash ./install.sh
+    EOT
+  }
+}
+
+resource "null_resource" "addon_verify" {
+  depends_on = [null_resource.join_all]
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 30
+      cd ~/IdeaProjects/terraform-k8s-mac/addons
+      bash ./verify.sh
+    EOT
+  }
+}
 
 resource "null_resource" "mysql_install" {
   depends_on = [null_resource.mysql_vm]
@@ -69,6 +122,59 @@ resource "null_resource" "redis_install" {
   }
 }
 
+# Harbor
+resource "null_resource" "registry_install" {
+  depends_on = [null_resource.vm_registry]
+
+  triggers = {
+    compose_sha = filesha1("${path.module}/compose/harbor/docker-compose.yml")
+    script_sha  = filesha1("${path.module}/scripts/vm_bootstrap.sh")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      multipass transfer ${path.module}/compose/harbor/docker-compose.yml vm-registry:/opt/harbor/docker-compose.yml
+      multipass transfer ${path.module}/scripts/vm_bootstrap.sh vm-registry:/tmp/vm_bootstrap.sh
+      multipass exec vm-registry -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry'
+    EOT
+  }
+}
+
+# Nexus
+resource "null_resource" "nexus_install" {
+  depends_on = [null_resource.vm_artifacts]
+
+  triggers = {
+    compose_sha = filesha1("${path.module}/compose/nexus/docker-compose.yml")
+    script_sha  = filesha1("${path.module}/shell/vm_bootstrap.sh")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      multipass transfer ${path.module}/compose/nexus/docker-compose.yml vm-artifacts:/opt/nexus/docker-compose.yml
+      multipass transfer ${path.module}/shell/vm_bootstrap.sh vm-artifacts:/tmp/vm_bootstrap.sh
+      multipass exec vm-artifacts -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh nexus /opt/nexus/docker-compose.yml /data/nexus-data'
+    EOT
+  }
+}
+
+# SonarQube
+resource "null_resource" "sonar_install" {
+  depends_on = [null_resource.vm_quality]
+
+  triggers = {
+    compose_sha = filesha1("${path.module}/compose/sonar/docker-compose.yml")
+    script_sha  = filesha1("${path.module}/shell/vm_bootstrap.sh")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      multipass transfer ${path.module}/compose/sonar/docker-compose.yml vm-quality:/opt/sonar/docker-compose.yml
+      multipass transfer ${path.module}/shell/vm_bootstrap.sh vm-quality:/tmp/vm_bootstrap.sh
+      multipass exec vm-quality -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh sonarqube /opt/sonar/docker-compose.yml /data/sonar /data/sonar-db'
+    EOT
+  }
+}
 
 resource "null_resource" "cleanup" {
   triggers = {

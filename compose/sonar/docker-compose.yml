@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15
+    container_name: sonar-pg
+    restart: always
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonarpass
+      POSTGRES_DB: sonarqube
+    volumes:
+      - /data/sonar-db:/var/lib/postgresql/data
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonarpass
+      SONAR_WEB_JAVAOPTS: "-Xmx2g -Xms1g"
+      SONAR_CE_JAVAOPTS:  "-Xmx2g -Xms1g"
+    ports:
+      - "9000:9000"
+    volumes:
+      - /data/sonar:/opt/sonarqube/data

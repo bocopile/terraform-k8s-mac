@@ -1,0 +1,26 @@
+#cloud-config
+runcmd:
+  # ... (기존 runcmd 상단 생략)
+  - bash -lc 'mkdir -p /backup/sonar'
+write_files:
+  - path: /usr/local/bin/backup_sonarqube.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      TS=$(date +%Y%m%d-%H%M%S)
+      # 1) DB 논리 백업 (pg_dump)
+      mkdir -p /backup/sonar/${TS}
+      docker exec -e PGPASSWORD=sonarpass sonar-pg pg_dump -U sonar -d sonarqube \
+        > /backup/sonar/${TS}/sonarqube.sql
+      # 2) Sonar 애플리케이션 데이터 스냅샷 (잠깐 정지 후 rsync 권장)
+      docker compose -f /opt/sonar/docker-compose.yml stop sonarqube
+      rsync -a /data/sonar/ /backup/sonar/${TS}/sonar-data/
+      docker compose -f /opt/sonar/docker-compose.yml start sonarqube
+      # 보존 7일
+      find /backup/sonar -mindepth 1 -maxdepth 1 -type d -mtime +6 -exec rm -rf {} \;
+  - path: /etc/cron.d/backup-sonarqube
+    permissions: '0644'
+    content: |
+      # 매일 03:25에 실행
+      25 3 * * * root /usr/local/bin/backup_sonarqube.sh >/var/log/backup_sonarqube.log 2>&1
