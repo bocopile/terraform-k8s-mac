@@ -47,7 +47,7 @@ terraform apply -auto-approve
 ### 2. 전체 삭제
 ```bash
 terraform destroy -auto-approve
-rm -rf .terraform .terraform.lock.hcl terraform.tfstate* kubeconfig
+rm -rf .terraform .terraform.lock.hcl terraform.tfstate* ~/kubeconfig
 ```
 
 ## 🔐 Redis/MySQL 접속 정보

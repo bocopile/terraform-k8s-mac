@@ -30,32 +30,30 @@ resource "null_resource" "mysql_vm" {
   }
 }
 
-# vm-registry.tf (Harbor)
-resource "null_resource" "vm_registry" {
+resource "null_resource" "harbor_vm" {
   depends_on = [null_resource.workers]
   provisioner "local-exec" {
     command = <<EOT
-      multipass launch --name vm-registry --cpus 4 --memory 8G --disk 100G --cloud-init ./init/registry.yaml
+      multipass launch --name harbor --cpus 4 --memory 8G --disk 100G --cloud-init ./init/harbor.yaml
     EOT
   }
 }
 
-# vm-artifacts.tf (Nexus)
-resource "null_resource" "vm_artifacts" {
+resource "null_resource" "nexus_vm" {
   depends_on = [null_resource.workers]
   provisioner "local-exec" {
     command = <<EOT
-      multipass launch --name vm-artifacts --cpus 4 --memory 8G --disk 100G --cloud-init ./init/nexus.yaml
+      multipass launch --name nexus --cpus 4 --memory 8G --disk 100G --cloud-init ./init/nexus.yaml
     EOT
   }
 }
 
-# vm-quality.tf (SonarQube + PG)
-resource "null_resource" "vm_quality" {
+# sonarqube.tf (SonarQube + PG)
+resource "null_resource" "sonarqube_vm" {
   depends_on = [null_resource.workers]
   provisioner "local-exec" {
     command = <<EOT
-      multipass launch --name vm-quality --cpus 6 --memory 12G --disk 50G --cloud-init ./init/sonarqube.yaml
+      multipass launch --name sonarqube --cpus 6 --memory 12G --disk 50G --cloud-init ./init/sonarqube.yaml
     EOT
   }
 }
@@ -79,29 +77,6 @@ resource "null_resource" "join_all" {
   }
 }
 
-
-resource "null_resource" "addon_install" {
-  depends_on = [null_resource.join_all]
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      cd ~/IdeaProjects/terraform-k8s-mac/addons
-      bash ./install.sh
-    EOT
-  }
-}
-
-resource "null_resource" "addon_verify" {
-  depends_on = [null_resource.join_all]
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      cd ~/IdeaProjects/terraform-k8s-mac/addons
-      bash ./verify.sh
-    EOT
-  }
-}
-
 resource "null_resource" "mysql_install" {
   depends_on = [null_resource.mysql_vm]
   provisioner "local-exec" {
@@ -122,13 +97,12 @@ resource "null_resource" "redis_install" {
   }
 }
 
-resource "null_resource" "registry_install" {
-  depends_on = [null_resource.vm_registry]
+resource "null_resource" "harbor_install" {
+  depends_on = [null_resource.harbor_vm]
 
   triggers = {
     compose_sha = filesha1("${path.module}/compose/harbor/docker-compose.yml")
-    # vm_bootstrap.sh 실제 위치가 scripts/ 라면 아래로 통일
-    script_sha  = filesha1("${path.module}/scripts/vm_bootstrap.sh")
+    script_sha  = filesha1("${path.module}/shell/vm_bootstrap.sh")
     user_sha    = var.harbor_user
     pass_sha    = sha1(var.harbor_password)
     host_sha    = var.harbor_server
@@ -136,32 +110,34 @@ resource "null_resource" "registry_install" {
 
   provisioner "local-exec" {
     command = <<EOT
+      multipass exec harbor-- bash -lc 'sudo mkdir -p /opt/harbor /data/registry/auth /etc/docker && sudo chown -R ubuntu:ubuntu /opt/harbor'
+
       multipass transfer ${path.module}/compose/harbor/docker-compose.yml vm-registry:/opt/harbor/docker-compose.yml
-      multipass transfer ${path.module}/scripts/vm_bootstrap.sh vm-registry:/tmp/vm_bootstrap.sh
-      multipass exec vm-registry -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
+      multipass transfer ${path.module}/shell/vm_bootstrap.sh vm-registry:/tmp/vm_bootstrap.sh
+      multipass exec harbor-- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
 
-      multipass exec vm-registry -- bash -lc "sudo mkdir -p /data/registry/auth"
-      multipass exec vm-registry -- bash -lc "sudo docker run --rm --entrypoint htpasswd httpd:2 -Bbn '${var.harbor_user}' '${var.harbor_password}' | sudo tee /data/registry/auth/htpasswd >/dev/null"
-      multipass exec vm-registry -- bash -lc "sudo chown root:root /data/registry/auth/htpasswd && sudo chmod 640 /data/registry/auth/htpasswd"
+      multipass exec harbor-- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
 
-      multipass exec vm-registry -- bash -lc 'sudo mkdir -p /etc/docker'
-      multipass exec vm-registry -- bash -lc "cat <<'JSON' | sudo tee /etc/docker/daemon.json
+      multipass exec harbor-- bash -lc "sudo docker run --rm --entrypoint htpasswd httpd:2 -Bbn '${var.harbor_user}' '${var.harbor_password}' | sudo tee /data/registry/auth/htpasswd >/dev/null"
+      multipass exec harbor-- bash -lc "sudo chown root:root /data/registry/auth/htpasswd && sudo chmod 640 /data/registry/auth/htpasswd"
+
+      multipass exec harbor-- bash -lc "cat <<'JSON' | sudo tee /etc/docker/daemon.json
 {
   \"insecure-registries\": [\"${var.harbor_server}\"]
 }
 JSON"
-      multipass exec vm-registry -- bash -lc 'sudo systemctl restart docker || true'
+      multipass exec harbor-- bash -lc 'sudo systemctl restart docker || true'
 
-      # compose 기동 (데이터 디렉토리 포함)
-      multipass exec vm-registry -- bash -lc '/tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry /data/registry/auth'
+      multipass exec harbor-- bash -lc '/tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry /data/registry/auth'
     EOT
   }
 }
 
 
+
 # Nexus
 resource "null_resource" "nexus_install" {
-  depends_on = [null_resource.vm_artifacts]
+  depends_on = [null_resource.nexus_vm]
 
   triggers = {
     compose_sha = filesha1("${path.module}/compose/nexus/docker-compose.yml")
@@ -170,16 +146,17 @@ resource "null_resource" "nexus_install" {
 
   provisioner "local-exec" {
     command = <<EOT
-      multipass transfer ${path.module}/compose/nexus/docker-compose.yml vm-artifacts:/opt/nexus/docker-compose.yml
-      multipass transfer ${path.module}/shell/vm_bootstrap.sh vm-artifacts:/tmp/vm_bootstrap.sh
-      multipass exec vm-artifacts -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh nexus /opt/nexus/docker-compose.yml /data/nexus-data'
+      multipass exec nexus -- bash -lc 'sudo mkdir -p /opt/nexus /data/nexus-data && sudo chown -R ubuntu:ubuntu /opt/nexus'
+      multipass transfer ${path.module}/compose/nexus/docker-compose.yml nexus:/opt/nexus/docker-compose.yml
+      multipass transfer ${path.module}/shell/vm_bootstrap.sh nexus:/tmp/vm_bootstrap.sh
+      multipass exec nexus -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh nexus /opt/nexus/docker-compose.yml /data/nexus-data'
     EOT
   }
 }
 
 # SonarQube
 resource "null_resource" "sonar_install" {
-  depends_on = [null_resource.vm_quality]
+  depends_on = [null_resource.sonarqube_vm]
 
   triggers = {
     compose_sha = filesha1("${path.module}/compose/sonar/docker-compose.yml")
@@ -188,9 +165,10 @@ resource "null_resource" "sonar_install" {
 
   provisioner "local-exec" {
     command = <<EOT
-      multipass transfer ${path.module}/compose/sonar/docker-compose.yml vm-quality:/opt/sonar/docker-compose.yml
-      multipass transfer ${path.module}/shell/vm_bootstrap.sh vm-quality:/tmp/vm_bootstrap.sh
-      multipass exec vm-quality -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh sonarqube /opt/sonar/docker-compose.yml /data/sonar /data/sonar-db'
+      multipass exec sonarqube -- bash -lc 'sudo mkdir -p /opt/sonar /data/sonar /data/sonar-db && sudo chown -R ubuntu:ubuntu /opt/sonar'
+      multipass transfer ${path.module}/compose/sonar/docker-compose.yml sonarqube:/opt/sonar/docker-compose.yml
+      multipass transfer ${path.module}/shell/vm_bootstrap.sh sonarqube:/tmp/vm_bootstrap.sh
+      multipass exec sonarqube -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh sonarqube /opt/sonar/docker-compose.yml /data/sonar /data/sonar-db'
     EOT
   }
 }
