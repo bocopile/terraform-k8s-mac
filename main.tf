@@ -110,32 +110,29 @@ resource "null_resource" "harbor_install" {
 
   provisioner "local-exec" {
     command = <<EOT
-      multipass exec harbor-- bash -lc 'sudo mkdir -p /opt/harbor /data/registry/auth /etc/docker && sudo chown -R ubuntu:ubuntu /opt/harbor'
+      multipass exec harbor -- bash -lc 'sudo mkdir -p /opt/harbor /data/registry/auth /etc/docker && sudo chown -R ubuntu:ubuntu /opt/harbor'
 
-      multipass transfer ${path.module}/compose/harbor/docker-compose.yml vm-registry:/opt/harbor/docker-compose.yml
-      multipass transfer ${path.module}/shell/vm_bootstrap.sh vm-registry:/tmp/vm_bootstrap.sh
-      multipass exec harbor-- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
+      multipass transfer ${path.module}/compose/harbor/docker-compose.yml harbor:/opt/harbor/docker-compose.yml
+      multipass transfer ${path.module}/shell/vm_bootstrap.sh harbor:/tmp/vm_bootstrap.sh
+      multipass exec harbor -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
 
-      multipass exec harbor-- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
+      multipass exec harbor -- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
 
-      multipass exec harbor-- bash -lc "sudo docker run --rm --entrypoint htpasswd httpd:2 -Bbn '${var.harbor_user}' '${var.harbor_password}' | sudo tee /data/registry/auth/htpasswd >/dev/null"
-      multipass exec harbor-- bash -lc "sudo chown root:root /data/registry/auth/htpasswd && sudo chmod 640 /data/registry/auth/htpasswd"
+      multipass exec harbor -- bash -lc "sudo docker run --rm --entrypoint htpasswd httpd:2 -Bbn '${var.harbor_user}' '${var.harbor_password}' | sudo tee /data/registry/auth/htpasswd >/dev/null"
+      multipass exec harbor -- bash -lc "sudo chown root:root /data/registry/auth/htpasswd && sudo chmod 640 /data/registry/auth/htpasswd"
 
-      multipass exec harbor-- bash -lc "cat <<'JSON' | sudo tee /etc/docker/daemon.json
+      multipass exec harbor -- bash -lc "cat <<'JSON' | sudo tee /etc/docker/daemon.json
 {
   \"insecure-registries\": [\"${var.harbor_server}\"]
 }
 JSON"
-      multipass exec harbor-- bash -lc 'sudo systemctl restart docker || true'
+      multipass exec harbor -- bash -lc 'sudo systemctl restart docker || true'
 
-      multipass exec harbor-- bash -lc '/tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry /data/registry/auth'
+      multipass exec harbor -- bash -lc '/tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry /data/registry/auth'
     EOT
   }
 }
 
-
-
-# Nexus
 resource "null_resource" "nexus_install" {
   depends_on = [null_resource.nexus_vm]
 
@@ -154,7 +151,6 @@ resource "null_resource" "nexus_install" {
   }
 }
 
-# SonarQube
 resource "null_resource" "sonar_install" {
   depends_on = [null_resource.sonarqube_vm]
 
@@ -172,6 +168,7 @@ resource "null_resource" "sonar_install" {
     EOT
   }
 }
+
 
 resource "null_resource" "cleanup" {
   triggers = {
