@@ -146,7 +146,10 @@ resource "null_resource" "nexus_install" {
       multipass exec nexus -- bash -lc 'sudo mkdir -p /opt/nexus /data/nexus-data && sudo chown -R ubuntu:ubuntu /opt/nexus'
       multipass transfer ${path.module}/compose/nexus/docker-compose.yml nexus:/opt/nexus/docker-compose.yml
       multipass transfer ${path.module}/shell/vm_bootstrap.sh nexus:/tmp/vm_bootstrap.sh
-      multipass exec nexus -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh nexus /opt/nexus/docker-compose.yml /data/nexus-data'
+      multipass exec nexus -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
+      multipass exec nexus -- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
+      multipass exec nexus -- bash -lc 'sudo chown -R 200:200 /data/nexus-data || true'
+      multipass exec nexus -- bash -lc '/tmp/vm_bootstrap.sh nexus /opt/nexus/docker-compose.yml /data/nexus-data'
     EOT
   }
 }
@@ -161,10 +164,14 @@ resource "null_resource" "sonar_install" {
 
   provisioner "local-exec" {
     command = <<EOT
+      multipass exec sonarqube -- bash -lc 'echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-sonarqube.conf >/dev/null && sudo sysctl --system >/dev/null'
       multipass exec sonarqube -- bash -lc 'sudo mkdir -p /opt/sonar /data/sonar /data/sonar-db && sudo chown -R ubuntu:ubuntu /opt/sonar'
       multipass transfer ${path.module}/compose/sonar/docker-compose.yml sonarqube:/opt/sonar/docker-compose.yml
       multipass transfer ${path.module}/shell/vm_bootstrap.sh sonarqube:/tmp/vm_bootstrap.sh
-      multipass exec sonarqube -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh && /tmp/vm_bootstrap.sh sonarqube /opt/sonar/docker-compose.yml /data/sonar /data/sonar-db'
+      multipass exec sonarqube -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
+      multipass exec sonarqube -- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
+      multipass exec sonarqube -- bash -lc 'sudo chown -R 1000:1000 /data/sonar /data/sonar-db || true'
+      multipass exec sonarqube -- bash -lc '/tmp/vm_bootstrap.sh sonarqube /opt/sonar/docker-compose.yml /data/sonar /data/sonar-db'
     EOT
   }
 }
