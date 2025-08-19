@@ -19,32 +19,14 @@ resource "null_resource" "workers" {
 resource "null_resource" "redis_vm" {
   depends_on = [null_resource.workers]
   provisioner "local-exec" {
-    command = "multipass launch 24.04 --name redis --cpus 2 --memory 8G --disk 50G --cloud-init init/redis.yaml"
+    command = "multipass launch 24.04 --name redis --cpus 2 --memory 6G --disk 50G --cloud-init init/redis.yaml"
   }
 }
 
 resource "null_resource" "mysql_vm" {
   depends_on = [null_resource.workers]
   provisioner "local-exec" {
-    command = "multipass launch 24.04 --name mysql --cpus 2 --memory 8G --disk 50G --cloud-init init/mysql.yaml"
-  }
-}
-
-resource "null_resource" "harbor_vm" {
-  depends_on = [null_resource.workers]
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass launch --name harbor --cpus 4 --memory 8G --disk 100G --cloud-init ./init/harbor.yaml
-    EOT
-  }
-}
-
-resource "null_resource" "nexus_vm" {
-  depends_on = [null_resource.workers]
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass launch --name nexus --cpus 4 --memory 8G --disk 100G --cloud-init ./init/nexus.yaml
-    EOT
+    command = "multipass launch 24.04 --name mysql --cpus 2 --memory 6G --disk 50G --cloud-init init/mysql.yaml"
   }
 }
 
@@ -93,63 +75,6 @@ resource "null_resource" "redis_install" {
     command = <<EOT
       multipass transfer ./shell/redis-install.sh redis:/home/ubuntu/redis-install.sh
       multipass exec redis -- bash -c "chmod +x /home/ubuntu/redis-install.sh && sudo bash /home/ubuntu/redis-install.sh '${var.redis_port}' '${var.redis_password}'"
-    EOT
-  }
-}
-
-resource "null_resource" "harbor_install" {
-  depends_on = [null_resource.harbor_vm]
-
-  triggers = {
-    compose_sha = filesha1("${path.module}/compose/harbor/docker-compose.yml")
-    script_sha  = filesha1("${path.module}/shell/vm_bootstrap.sh")
-    user_sha    = var.harbor_user
-    pass_sha    = sha1(var.harbor_password)
-    host_sha    = var.harbor_server
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass exec harbor -- bash -lc 'sudo mkdir -p /opt/harbor /data/registry/auth /etc/docker && sudo chown -R ubuntu:ubuntu /opt/harbor'
-
-      multipass transfer ${path.module}/compose/harbor/docker-compose.yml harbor:/opt/harbor/docker-compose.yml
-      multipass transfer ${path.module}/shell/vm_bootstrap.sh harbor:/tmp/vm_bootstrap.sh
-      multipass exec harbor -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
-
-      multipass exec harbor -- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
-
-      multipass exec harbor -- bash -lc "sudo docker run --rm --entrypoint htpasswd httpd:2 -Bbn '${var.harbor_user}' '${var.harbor_password}' | sudo tee /data/registry/auth/htpasswd >/dev/null"
-      multipass exec harbor -- bash -lc "sudo chown root:root /data/registry/auth/htpasswd && sudo chmod 640 /data/registry/auth/htpasswd"
-
-      multipass exec harbor -- bash -lc "cat <<'JSON' | sudo tee /etc/docker/daemon.json
-{
-  \"insecure-registries\": [\"${var.harbor_server}\"]
-}
-JSON"
-      multipass exec harbor -- bash -lc 'sudo systemctl restart docker || true'
-
-      multipass exec harbor -- bash -lc '/tmp/vm_bootstrap.sh harbor /opt/harbor/docker-compose.yml /data/registry /data/registry/auth'
-    EOT
-  }
-}
-
-resource "null_resource" "nexus_install" {
-  depends_on = [null_resource.nexus_vm]
-
-  triggers = {
-    compose_sha = filesha1("${path.module}/compose/nexus/docker-compose.yml")
-    script_sha  = filesha1("${path.module}/shell/vm_bootstrap.sh")
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass exec nexus -- bash -lc 'sudo mkdir -p /opt/nexus /data/nexus-data && sudo chown -R ubuntu:ubuntu /opt/nexus'
-      multipass transfer ${path.module}/compose/nexus/docker-compose.yml nexus:/opt/nexus/docker-compose.yml
-      multipass transfer ${path.module}/shell/vm_bootstrap.sh nexus:/tmp/vm_bootstrap.sh
-      multipass exec nexus -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
-      multipass exec nexus -- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
-      multipass exec nexus -- bash -lc 'sudo chown -R 200:200 /data/nexus-data || true'
-      multipass exec nexus -- bash -lc '/tmp/vm_bootstrap.sh nexus /opt/nexus/docker-compose.yml /data/nexus-data'
     EOT
   }
 }

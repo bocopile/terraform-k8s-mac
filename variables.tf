@@ -14,7 +14,7 @@ variable "masters" {
 variable "workers" {
   description = "Worker 노드 수"
   type        = number
-  default     = 6
+  default     = 3
 }
 
 variable "redis_port" {
