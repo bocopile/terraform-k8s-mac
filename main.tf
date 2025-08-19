@@ -35,7 +35,7 @@ resource "null_resource" "sonarqube_vm" {
   depends_on = [null_resource.workers]
   provisioner "local-exec" {
     command = <<EOT
-      multipass launch --name sonarqube --cpus 6 --memory 12G --disk 50G --cloud-init ./init/sonarqube.yaml
+      multipass launch --name sonarqube --cpus 4 --memory 8G --disk 50G --cloud-init ./init/sonarqube.yaml
     EOT
   }
 }
