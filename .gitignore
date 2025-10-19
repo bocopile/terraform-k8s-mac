@@ -48,4 +48,4 @@ secrets.env
 ./shell/join-controlplane.sh
 ./shell/join.sh
 
-.claude/**
+# .claude/** - REMOVED: We want to commit workflow documentation
