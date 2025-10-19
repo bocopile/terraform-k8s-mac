@@ -30,17 +30,6 @@ resource "null_resource" "mysql_vm" {
   }
 }
 
-# sonarqube.tf (SonarQube + PG)
-resource "null_resource" "sonarqube_vm" {
-  depends_on = [null_resource.workers]
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass launch --name sonarqube --cpus 4 --memory 8G --disk 50G --cloud-init ./init/sonarqube.yaml
-    EOT
-  }
-}
-
-
 resource "null_resource" "init_cluster" {
   depends_on = [null_resource.workers]
 
@@ -78,29 +67,6 @@ resource "null_resource" "redis_install" {
     EOT
   }
 }
-
-resource "null_resource" "sonar_install" {
-  depends_on = [null_resource.sonarqube_vm]
-
-  triggers = {
-    compose_sha = filesha1("${path.module}/compose/sonar/docker-compose.yml")
-    script_sha  = filesha1("${path.module}/shell/vm_bootstrap.sh")
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass exec sonarqube -- bash -lc 'echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-sonarqube.conf >/dev/null && sudo sysctl --system >/dev/null'
-      multipass exec sonarqube -- bash -lc 'sudo mkdir -p /opt/sonar /data/sonar /data/sonar-db && sudo chown -R ubuntu:ubuntu /opt/sonar'
-      multipass transfer ${path.module}/compose/sonar/docker-compose.yml sonarqube:/opt/sonar/docker-compose.yml
-      multipass transfer ${path.module}/shell/vm_bootstrap.sh sonarqube:/tmp/vm_bootstrap.sh
-      multipass exec sonarqube -- bash -lc 'chmod +x /tmp/vm_bootstrap.sh'
-      multipass exec sonarqube -- bash -lc 'if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi'
-      multipass exec sonarqube -- bash -lc 'sudo chown -R 1000:1000 /data/sonar /data/sonar-db || true'
-      multipass exec sonarqube -- bash -lc '/tmp/vm_bootstrap.sh sonarqube /opt/sonar/docker-compose.yml /data/sonar /data/sonar-db'
-    EOT
-  }
-}
-
 
 resource "null_resource" "cleanup" {
   triggers = {

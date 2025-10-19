@@ -47,3 +47,5 @@ secrets.env
 #join shell
 ./shell/join-controlplane.sh
 ./shell/join.sh
+
+.claude/**
