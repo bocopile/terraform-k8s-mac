@@ -34,6 +34,10 @@ secrets.env
 .env
 .env.*
 
+# Claude Code - Environment only (keep .claude directory in git)
+# The .claude directory contains project configuration and should be committed
+# Only exclude sensitive environment files
+
 # IDE / editor files
 .vscode/
 .idea/*
