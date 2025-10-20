@@ -1,0 +1,171 @@
+---
+# Kube-State-Metrics ServiceAccount
+# 목적: Kube-State-Metrics Pod가 사용할 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-state-metrics
+  namespace: kube-system
+  labels:
+    app: kube-state-metrics
+    managed-by: terraform
+
+---
+# Kube-State-Metrics ClusterRole - 클러스터 메트릭 수집
+# 목적: 모든 Kubernetes 리소스의 상태 메트릭 수집
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-state-metrics
+  labels:
+    app: kube-state-metrics
+    managed-by: terraform
+rules:
+  # ConfigMaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["list", "watch"]
+
+  # Secrets (메타데이터만, 값은 수집하지 않음)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["list", "watch"]
+
+  # Nodes
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "watch"]
+
+  # Pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "watch"]
+
+  # Services
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["list", "watch"]
+
+  # ResourceQuotas
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["list", "watch"]
+
+  # ReplicationControllers
+  - apiGroups: [""]
+    resources: ["replicationcontrollers"]
+    verbs: ["list", "watch"]
+
+  # LimitRanges
+  - apiGroups: [""]
+    resources: ["limitranges"]
+    verbs: ["list", "watch"]
+
+  # PersistentVolumes
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list", "watch"]
+
+  # PersistentVolumeClaims
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["list", "watch"]
+
+  # Namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list", "watch"]
+
+  # Endpoints
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["list", "watch"]
+
+  # Deployments
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["list", "watch"]
+
+  # StatefulSets
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["list", "watch"]
+
+  # DaemonSets
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["list", "watch"]
+
+  # ReplicaSets
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["list", "watch"]
+
+  # Jobs
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["list", "watch"]
+
+  # CronJobs
+  - apiGroups: ["batch"]
+    resources: ["cronjobs"]
+    verbs: ["list", "watch"]
+
+  # HorizontalPodAutoscalers
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["list", "watch"]
+
+  # Ingresses
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["list", "watch"]
+
+  # NetworkPolicies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["list", "watch"]
+
+  # PodDisruptionBudgets
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["list", "watch"]
+
+  # StorageClasses
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["list", "watch"]
+
+  # VolumeAttachments
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["list", "watch"]
+
+  # CertificateSigningRequests
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["list", "watch"]
+
+  # Leases
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["list", "watch"]
+
+---
+# Kube-State-Metrics ClusterRoleBinding
+# 목적: kube-state-metrics ServiceAccount에 메트릭 수집 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-state-metrics
+  labels:
+    app: kube-state-metrics
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: kube-state-metrics
+    namespace: kube-system
