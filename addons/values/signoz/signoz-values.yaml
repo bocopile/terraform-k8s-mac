@@ -10,6 +10,23 @@ global:
 otelCollector:
   gateway:
     enabled: true
+    # High Availability: 다중 게이트웨이로 SPOF 제거
+    replicas: 2
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/component
+                    operator: In
+                    values:
+                      - otel-collector-gateway
+              topologyKey: kubernetes.io/hostname
     service:
       type: ClusterIP
       ports:
@@ -51,6 +68,23 @@ otelCollector:
         value: local-multipass
 
 frontend:
+  # High Availability: 프론트엔드 복제본 증가
+  replicas: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - frontend
+            topologyKey: kubernetes.io/hostname
   service:
     type: ClusterIP
 
@@ -58,6 +92,21 @@ ingress:
   enabled: false  # we expose via Istio below
 
 clickhouse:
+  # High Availability: ClickHouse 클러스터 구성
+  replicaCount: 2
+  shards: 1
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: clickhouse
+            topologyKey: kubernetes.io/hostname
   resources:
     requests:
       cpu: "500m"
