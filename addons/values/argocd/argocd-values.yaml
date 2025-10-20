@@ -6,6 +6,16 @@ configs:
 # High Availability: Controller 고가용성 설정
 controller:
   replicas: 2
+  # Security: SecurityContext 설정
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -22,6 +32,16 @@ controller:
 server:
   # High Availability: Server 고가용성 설정
   replicas: 2
+  # Security: SecurityContext 설정
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
   autoscaling:
     enabled: false
   affinity:
@@ -44,6 +64,16 @@ server:
 # High Availability: Repo Server 고가용성 설정
 repoServer:
   replicas: 2
+  # Security: SecurityContext 설정
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
