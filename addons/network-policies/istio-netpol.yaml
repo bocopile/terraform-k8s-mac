@@ -1,0 +1,90 @@
+---
+# Istio NetworkPolicy - Service Mesh 네트워크 격리
+# 목적: Istio 컴포넌트의 트래픽을 제어하고 mTLS 적용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: istio-system-isolation
+  namespace: istio-system
+  labels:
+    app: istio
+    managed-by: terraform
+spec:
+  podSelector: {}  # 네임스페이스 내 모든 Pod에 적용
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # 1. Ingress Gateway: 외부에서 모든 트래픽 허용
+    - from:
+        - namespaceSelector: {}
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80    # HTTP
+        - protocol: TCP
+          port: 443   # HTTPS
+        - protocol: TCP
+          port: 15021 # Health check
+
+    # 2. Pilot (Istiod): Envoy Sidecar에서 xDS 요청
+    - from:
+        - namespaceSelector: {}  # 모든 네임스페이스의 Sidecar
+      ports:
+        - protocol: TCP
+          port: 15010 # Envoy xDS gRPC
+        - protocol: TCP
+          port: 15012 # Envoy xDS HTTPS
+
+    # 3. 내부 컴포넌트 간 통신
+    - from:
+        - podSelector:
+            matchLabels:
+              app: istio
+      ports:
+        - protocol: TCP
+          port: 8080  # HTTP
+        - protocol: TCP
+          port: 15014 # Metrics
+
+  egress:
+    # 1. DNS 조회 허용 (CoreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # 2. Kubernetes API Server (Service Discovery, Ingress 설정)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 6443
+
+    # 3. 모든 네임스페이스로 트래픽 프록시 (Ingress Gateway 역할)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 3301  # SigNoz Frontend
+        - protocol: TCP
+          port: 8200  # Vault UI
+
+    # 4. Pilot이 모든 Sidecar에 설정 배포
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 15012 # xDS over HTTPS

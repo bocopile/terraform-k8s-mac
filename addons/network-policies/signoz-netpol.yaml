@@ -1,0 +1,85 @@
+---
+# SigNoz NetworkPolicy - 네트워크 격리 및 트래픽 제어
+# 목적: SigNoz 네임스페이스에서 허용된 트래픽만 인입/출입 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: signoz-isolation
+  namespace: signoz
+  labels:
+    app: signoz
+    managed-by: terraform
+spec:
+  podSelector: {}  # 네임스페이스 내 모든 Pod에 적용
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # 1. OTEL Gateway: 다른 네임스페이스에서 메트릭/로그 수집 허용
+    - from:
+        - namespaceSelector: {}  # 모든 네임스페이스 허용
+      ports:
+        - protocol: TCP
+          port: 4317  # gRPC (OpenTelemetry)
+        - protocol: TCP
+          port: 4318  # HTTP (OpenTelemetry)
+
+    # 2. Frontend: Istio Gateway에서만 UI 접근 허용
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 3301  # SigNoz Frontend
+
+    # 3. ClickHouse 내부 통신: 같은 네임스페이스 내 Pod 간 통신
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: signoz
+      ports:
+        - protocol: TCP
+          port: 9000  # ClickHouse Native
+        - protocol: TCP
+          port: 8123  # ClickHouse HTTP
+
+  egress:
+    # 1. DNS 조회 허용 (CoreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # 2. ClickHouse 내부 통신 (데이터 저장)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: signoz
+      ports:
+        - protocol: TCP
+          port: 9000  # ClickHouse Native
+        - protocol: TCP
+          port: 8123  # ClickHouse HTTP
+
+    # 3. Kubernetes API Server (메타데이터 조회)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 6443
+
+    # 4. 외부 HTTP/HTTPS (업데이트 확인, 플러그인 다운로드)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+        - protocol: TCP
+          port: 80   # HTTP

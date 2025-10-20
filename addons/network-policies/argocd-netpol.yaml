@@ -1,0 +1,105 @@
+---
+# ArgoCD NetworkPolicy - GitOps 플랫폼 네트워크 격리
+# 목적: ArgoCD가 Git 서버 및 Kubernetes API만 접근하도록 제한
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-isolation
+  namespace: argocd
+  labels:
+    app: argocd
+    managed-by: terraform
+spec:
+  podSelector: {}  # 네임스페이스 내 모든 Pod에 적용
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # 1. Server: Istio Gateway에서만 UI/API 접근 허용
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 8080  # ArgoCD Server HTTP
+        - protocol: TCP
+          port: 8083  # Metrics
+
+    # 2. 같은 네임스페이스 내 Pod 간 통신 (Controller, Repo, ApplicationSet)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd
+      ports:
+        - protocol: TCP
+          port: 8080  # HTTP
+        - protocol: TCP
+          port: 8081  # Metrics
+        - protocol: TCP
+          port: 6379  # Redis
+
+  egress:
+    # 1. Git 서버 (GitHub, GitLab, Bitbucket 등)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS (Git over HTTPS)
+        - protocol: TCP
+          port: 22   # SSH (Git over SSH)
+
+    # 2. Kubernetes API Server (클러스터 리소스 관리)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 6443  # K8s API Server
+
+    # 3. DNS 조회 허용 (CoreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # 4. Redis (내부 캐시 및 세션 관리)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # 5. Application Controller와 Repo Server 간 통신
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8081
+
+    # 6. Helm Chart Repository (HTTP/HTTPS)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+    # 7. Container Registry (Docker pull)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5000  # Harbor, Private Registry

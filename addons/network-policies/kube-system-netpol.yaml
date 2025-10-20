@@ -1,0 +1,72 @@
+---
+# Kube-System NetworkPolicy - 시스템 네임스페이스 보호
+# 목적: CoreDNS, kube-proxy 등 시스템 컴포넌트 접근 제어
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kube-system-isolation
+  namespace: kube-system
+  labels:
+    app: kube-system
+    managed-by: terraform
+spec:
+  podSelector: {}  # 네임스페이스 내 모든 Pod에 적용
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # 1. CoreDNS: 모든 네임스페이스에서 DNS 쿼리 허용
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53  # DNS
+        - protocol: TCP
+          port: 53  # DNS over TCP
+
+    # 2. Kube-Proxy: 노드에서 접근 (호스트 네트워크)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 10249  # Kube-Proxy Metrics
+        - protocol: TCP
+          port: 10256  # Kube-Proxy Health
+
+    # 3. Kube-State-Metrics: Prometheus에서 메트릭 수집
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080  # Metrics
+
+  egress:
+    # 1. DNS 재귀 쿼리 (외부 DNS 서버)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 2. Kubernetes API Server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 6443
+
+    # 3. 외부 HTTP/HTTPS (업데이트, 이미지 다운로드)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
