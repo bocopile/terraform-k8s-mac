@@ -1,0 +1,208 @@
+# ============================================================
+# Terraform Backend 설정 예제
+# ============================================================
+#
+# 이 파일은 Terraform State를 원격으로 저장하기 위한 Backend 설정 예제입니다.
+# 로컬 개발 환경에서는 필요하지 않지만, 팀 협업 또는 CI/CD 환경에서는 권장됩니다.
+#
+# 사용 방법:
+# 1. 이 파일을 backend.tf로 복사
+# 2. 사용할 Backend 유형 선택 (S3, GCS, Terraform Cloud 등)
+# 3. terraform init -reconfigure 실행
+#
+# 주의: backend.tf 파일은 .gitignore에 추가하여 민감정보 유출 방지
+#
+# ============================================================
+
+# ============================================================
+# AWS S3 Backend (권장)
+# ============================================================
+#
+# 사용 시나리오:
+# - AWS 환경에서 운영
+# - 팀 협업 필요
+# - State Locking 필요 (DynamoDB 사용)
+#
+# terraform {
+#   backend "s3" {
+#     bucket         = "my-terraform-state-bucket"
+#     key            = "terraform-k8s-mac/terraform.tfstate"
+#     region         = "ap-northeast-2"
+#     encrypt        = true
+#     dynamodb_table = "terraform-state-lock"
+#
+#     # State Locking을 위한 DynamoDB 테이블 설정 필요:
+#     # aws dynamodb create-table \
+#     #   --table-name terraform-state-lock \
+#     #   --attribute-definitions AttributeName=LockID,AttributeType=S \
+#     #   --key-schema AttributeName=LockID,KeyType=HASH \
+#     #   --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+#   }
+# }
+
+# ============================================================
+# Google Cloud Storage Backend
+# ============================================================
+#
+# 사용 시나리오:
+# - GCP 환경에서 운영
+# - 팀 협업 필요
+#
+# terraform {
+#   backend "gcs" {
+#     bucket      = "my-terraform-state-bucket"
+#     prefix      = "terraform-k8s-mac"
+#     credentials = "path/to/service-account-key.json"
+#   }
+# }
+
+# ============================================================
+# Azure Blob Storage Backend
+# ============================================================
+#
+# 사용 시나리오:
+# - Azure 환경에서 운영
+# - 팀 협업 필요
+#
+# terraform {
+#   backend "azurerm" {
+#     resource_group_name  = "terraform-state-rg"
+#     storage_account_name = "tfstatestorage"
+#     container_name       = "tfstate"
+#     key                  = "terraform-k8s-mac.tfstate"
+#   }
+# }
+
+# ============================================================
+# Terraform Cloud Backend (권장 - 팀 협업)
+# ============================================================
+#
+# 사용 시나리오:
+# - 팀 협업 필요
+# - State Locking 자동 처리
+# - 무료 티어 제공 (5명까지)
+# - Remote Execution 지원
+#
+# terraform {
+#   cloud {
+#     organization = "my-organization"
+#
+#     workspaces {
+#       name = "terraform-k8s-mac"
+#     }
+#   }
+# }
+#
+# 설정 방법:
+# 1. https://app.terraform.io/ 회원가입
+# 2. Organization 생성
+# 3. terraform login 실행
+# 4. 위 설정 활성화 후 terraform init
+
+# ============================================================
+# HTTP Backend (Self-Hosted)
+# ============================================================
+#
+# 사용 시나리오:
+# - 자체 State 저장 서버 운영
+# - Terraform Enterprise 사용
+#
+# terraform {
+#   backend "http" {
+#     address        = "https://terraform-state.example.com/state/terraform-k8s-mac"
+#     lock_address   = "https://terraform-state.example.com/lock/terraform-k8s-mac"
+#     unlock_address = "https://terraform-state.example.com/unlock/terraform-k8s-mac"
+#     username       = "terraform"
+#     password       = var.backend_password
+#   }
+# }
+
+# ============================================================
+# Consul Backend
+# ============================================================
+#
+# 사용 시나리오:
+# - HashiCorp Consul 운영 중
+# - 서비스 메시 환경
+#
+# terraform {
+#   backend "consul" {
+#     address = "consul.example.com:8500"
+#     scheme  = "https"
+#     path    = "terraform/k8s-mac"
+#   }
+# }
+
+# ============================================================
+# 로컬 Backend (기본값)
+# ============================================================
+#
+# 사용 시나리오:
+# - 개인 개발 환경
+# - 팀 협업 불필요
+# - 현재 프로젝트 기본 설정
+#
+# terraform {
+#   backend "local" {
+#     path = "terraform.tfstate"
+#   }
+# }
+#
+# 참고: backend 블록을 정의하지 않으면 자동으로 local backend 사용
+
+# ============================================================
+# Backend 마이그레이션
+# ============================================================
+#
+# Local → Remote Backend 마이그레이션:
+#
+# 1. 현재 State 백업
+#    cp terraform.tfstate terraform.tfstate.backup
+#
+# 2. backend.tf 파일 생성 (이 파일 복사)
+#
+# 3. Backend 재초기화
+#    terraform init -reconfigure
+#
+# 4. State 마이그레이션 확인
+#    terraform state list
+#
+# 5. 로컬 State 파일 삭제 (선택)
+#    rm terraform.tfstate terraform.tfstate.backup
+#
+# Remote → Local Backend 마이그레이션:
+#
+# 1. backend.tf 파일 삭제 또는 주석 처리
+#
+# 2. Backend 재초기화
+#    terraform init -reconfigure
+#
+# 3. State 다운로드 확인
+#    ls -lh terraform.tfstate
+
+# ============================================================
+# Best Practices
+# ============================================================
+#
+# 1. State Encryption:
+#    - S3: encrypt = true
+#    - GCS: 자동 암호화
+#    - Terraform Cloud: 자동 암호화
+#
+# 2. State Locking:
+#    - S3: DynamoDB 사용
+#    - GCS: 자동 지원
+#    - Terraform Cloud: 자동 지원
+#
+# 3. State Versioning:
+#    - S3: Bucket Versioning 활성화
+#    - GCS: Object Versioning 활성화
+#
+# 4. Access Control:
+#    - S3: IAM Policy로 접근 제어
+#    - GCS: IAM 권한 설정
+#    - Terraform Cloud: RBAC
+#
+# 5. .gitignore 추가:
+#    echo "backend.tf" >> .gitignore
+#    echo "*.tfstate*" >> .gitignore
