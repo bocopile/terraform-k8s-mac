@@ -1,8 +1,17 @@
 global:
   proxy:
     autoInject: enabled
+  # Security: mTLS 강제 적용 (STRICT mode)
   mtls:
     enabled: true
+  # Security: SecurityContext 설정
+  securityContext:
+    runAsUser: 1337
+    runAsGroup: 1337
+    runAsNonRoot: true
+    fsGroup: 1337
+    seccompProfile:
+      type: RuntimeDefault
 
 gateways:
   istio-ingressgateway:

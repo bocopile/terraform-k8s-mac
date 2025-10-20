@@ -12,6 +12,19 @@ otelCollector:
     enabled: true
     # High Availability: 다중 게이트웨이로 SPOF 제거
     replicas: 2
+    # Security: SecurityContext 설정
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
     podDisruptionBudget:
       enabled: true
       minAvailable: 1
@@ -70,6 +83,19 @@ otelCollector:
 frontend:
   # High Availability: 프론트엔드 복제본 증가
   replicas: 2
+  # Security: SecurityContext 설정
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
