@@ -1,82 +1,88 @@
+# ============================================================
+# Terraform Main Configuration (Modularized)
+# ============================================================
+#
+# 이 파일은 모듈을 사용하여 인프라를 구성합니다.
+#
+# 모듈 구조:
+# - k8s-cluster: Kubernetes Master + Worker 노드
+# - database: MySQL + Redis 인스턴스
+# - cluster-init: Kubernetes Cluster 초기화
+#
+# ============================================================
 
-resource "null_resource" "masters" {
-  count = var.masters
+# ============================================================
+# Kubernetes Cluster Module
+# ============================================================
+module "k8s_cluster" {
+  source = "./modules/k8s-cluster"
 
-  provisioner "local-exec" {
-    command = "multipass launch ${var.multipass_image} --name k8s-master-${count.index} --mem 4G --disk 40G --cpus 2 --cloud-init init/k8s.yaml"
-  }
+  # Master Configuration
+  master_count       = var.masters
+  master_name_prefix = "k8s-master"
+  master_memory      = "4G"
+  master_disk        = "40G"
+  master_cpus        = 2
+
+  # Worker Configuration
+  worker_count       = var.workers
+  worker_name_prefix = "k8s-worker"
+  worker_memory      = "4G"
+  worker_disk        = "50G"
+  worker_cpus        = 2
+
+  # Common Configuration
+  multipass_image = var.multipass_image
+  cloud_init_path = "init/k8s.yaml"
 }
 
-resource "null_resource" "workers" {
-  depends_on = [null_resource.masters]
-  count      = var.workers
+# ============================================================
+# Database Module
+# ============================================================
+module "database" {
+  source = "./modules/database"
 
-  provisioner "local-exec" {
-    command = "multipass launch ${var.multipass_image} --name k8s-worker-${count.index} --mem 4G --disk 50G --cpus 2 --cloud-init init/k8s.yaml"
-  }
+  # Redis Configuration
+  redis_enabled         = true
+  redis_name            = "redis"
+  redis_cpus            = 2
+  redis_memory          = "6G"
+  redis_disk            = "50G"
+  redis_port            = var.redis_port
+  redis_password        = var.redis_password
+  redis_cloud_init_path = "init/redis.yaml"
+  redis_install_script  = "./shell/redis-install.sh"
+
+  # MySQL Configuration
+  mysql_enabled         = true
+  mysql_name            = "mysql"
+  mysql_cpus            = 2
+  mysql_memory          = "6G"
+  mysql_disk            = "50G"
+  mysql_root_password   = var.mysql_root_password
+  mysql_database        = var.mysql_database
+  mysql_user            = var.mysql_user
+  mysql_user_password   = var.mysql_user_password
+  mysql_port            = var.mysql_port
+  mysql_cloud_init_path = "init/mysql.yaml"
+  mysql_install_script  = "./shell/mysql-install.sh"
+
+  # Common Configuration
+  ubuntu_image = "24.04"
 }
 
-resource "null_resource" "redis_vm" {
-  depends_on = [null_resource.workers]
-  provisioner "local-exec" {
-    command = "multipass launch 24.04 --name redis --cpus 2 --memory 6G --disk 50G --cloud-init init/redis.yaml"
-  }
-}
+# ============================================================
+# Cluster Initialization Module
+# ============================================================
+module "cluster_init" {
+  source = "./modules/cluster-init"
 
-resource "null_resource" "mysql_vm" {
-  depends_on = [null_resource.workers]
-  provisioner "local-exec" {
-    command = "multipass launch 24.04 --name mysql --cpus 2 --memory 6G --disk 50G --cloud-init init/mysql.yaml"
-  }
-}
+  depends_on = [
+    module.k8s_cluster,
+    module.database
+  ]
 
-resource "null_resource" "init_cluster" {
-  depends_on = [null_resource.workers]
-
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass transfer ./shell/cluster-init.sh k8s-master-0:/home/ubuntu/cluster-init.sh
-      multipass exec k8s-master-0 -- bash -c "chmod +x /home/ubuntu/cluster-init.sh && sudo bash /home/ubuntu/cluster-init.sh"
-    EOT
-  }
-}
-
-resource "null_resource" "join_all" {
-  depends_on = [null_resource.init_cluster]
-  provisioner "local-exec" {
-    command = "bash shell/join-all.sh"
-  }
-}
-
-resource "null_resource" "mysql_install" {
-  depends_on = [null_resource.mysql_vm]
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass transfer ./shell/mysql-install.sh mysql:/home/ubuntu/mysql-install.sh
-      multipass exec mysql -- bash -c "chmod +x /home/ubuntu/mysql-install.sh && sudo bash /home/ubuntu/mysql-install.sh '${var.mysql_root_password}' '${var.mysql_database}' '${var.mysql_user}' '${var.mysql_user_password}' '${var.mysql_port}'"
-    EOT
-  }
-}
-
-resource "null_resource" "redis_install" {
-  depends_on = [null_resource.redis_vm]
-  provisioner "local-exec" {
-    command = <<EOT
-      multipass transfer ./shell/redis-install.sh redis:/home/ubuntu/redis-install.sh
-      multipass exec redis -- bash -c "chmod +x /home/ubuntu/redis-install.sh && sudo bash /home/ubuntu/redis-install.sh '${var.redis_port}' '${var.redis_password}'"
-    EOT
-  }
-}
-
-resource "null_resource" "cleanup" {
-  triggers = {
-    always_run = "${timestamp()}"
-  }
-
-  provisioner "local-exec" {
-    when    = destroy
-    command = <<EOT
-      multipass delete --all && multipass purge
-    EOT
-  }
+  first_master_node   = "k8s-master-0"
+  cluster_init_script = "./shell/cluster-init.sh"
+  join_all_script     = "shell/join-all.sh"
 }
