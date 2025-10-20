@@ -1,0 +1,41 @@
+name: Terraform Format Check
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - '.github/workflows/terraform-fmt.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '**.tf'
+
+jobs:
+  fmt:
+    name: Terraform Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Post Format Check Results
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "::error::Terraform files are not formatted. Run 'terraform fmt -recursive' locally."
+          exit 1
+
+      - name: Success
+        if: steps.fmt.outcome == 'success'
+        run: echo "✅ All Terraform files are properly formatted"
