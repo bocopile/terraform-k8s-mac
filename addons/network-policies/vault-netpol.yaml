@@ -1,0 +1,81 @@
+---
+# Vault NetworkPolicy - 시크릿 관리 플랫폼 네트워크 격리
+# 목적: Vault가 Raft 클러스터 내부 통신 및 Istio Gateway만 접근하도록 제한
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-isolation
+  namespace: vault
+  labels:
+    app: vault
+    managed-by: terraform
+spec:
+  podSelector: {}  # 네임스페이스 내 모든 Pod에 적용
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # 1. Vault UI/API: Istio Gateway에서만 접근 허용
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 8200  # Vault HTTP API
+
+    # 2. Raft Cluster 내부 통신 (HA 모드)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+      ports:
+        - protocol: TCP
+          port: 8200  # Vault API (peer communication)
+        - protocol: TCP
+          port: 8201  # Vault Cluster (Raft consensus)
+
+    # 3. 다른 네임스페이스에서 시크릿 조회 허용 (애플리케이션)
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8200  # Vault API
+
+  egress:
+    # 1. DNS 조회 허용 (CoreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # 2. Raft Cluster 내부 통신 (Vault Pod 간)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+      ports:
+        - protocol: TCP
+          port: 8200  # Vault API
+        - protocol: TCP
+          port: 8201  # Vault Cluster (Raft)
+
+    # 3. Kubernetes API Server (Auth Backend, Service Account 검증)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 6443
+
+    # 4. HTTPS (외부 CA, CRL 다운로드)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
