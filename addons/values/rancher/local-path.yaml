@@ -2,9 +2,13 @@ storageClass:
   create: true
   defaultClass: true
   name: local-path
-  reclaimPolicy: Delete
+  # Data Persistence: Retain 정책으로 변경하여 PVC 삭제 시에도 데이터 보존
+  # Delete → Retain: Pod/PVC 삭제 시 PV와 데이터를 보존하여 복구 가능
+  reclaimPolicy: Retain
   volumeBindingMode: WaitForFirstConsumer
   provisioner: rancher.io/local-path
+  # 볼륨 확장 허용
+  allowVolumeExpansion: true
 
 helperPod:
   mountPath: /opt/local-path-provisioner

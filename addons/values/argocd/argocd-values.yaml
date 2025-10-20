@@ -72,3 +72,30 @@ applicationSet:
   pdb:
     enabled: true
     minAvailable: 1
+
+# Data Persistence: Redis 데이터 영속성
+redis:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClassName: local-path
+    accessMode: ReadWriteOnce
+
+# Data Persistence: Controller 데이터 영속성
+controller:
+  volumes:
+    - name: app-controller-data
+      persistentVolumeClaim:
+        claimName: argocd-controller-data
+  volumeMounts:
+    - name: app-controller-data
+      mountPath: /home/argocd/controller-data
+
+# PVC for controller data
+persistence:
+  controller:
+    enabled: true
+    size: 10Gi
+    storageClassName: local-path
+    accessMode: ReadWriteOnce

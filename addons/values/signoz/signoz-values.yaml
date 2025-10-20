@@ -115,7 +115,20 @@ clickhouse:
       cpu: "2"
       memory: "4Gi"
 
+# Data Persistence: 데이터 보존 정책
 retentionPeriod:
-  metrics: 15d
+  # 메트릭: 30일 보존 (모니터링 트렌드 분석)
+  metrics: 30d
+  # 트레이스: 15일 보존 (디버깅 및 성능 분석)
   traces: 15d
-  logs: 7d
+  # 로그: 30일 보존 (감사 및 트러블슈팅)
+  logs: 30d
+
+# ClickHouse 백업 설정 (권장)
+clickhouse:
+  backup:
+    enabled: true
+    # 백업 보존 기간
+    retention: 7
+    # 백업 스케줄 (매일 새벽 2시)
+    schedule: "0 2 * * *"
