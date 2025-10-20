@@ -7,6 +7,20 @@ global:
 gateways:
   istio-ingressgateway:
     type: LoadBalancer
+    # High Availability: Ingress Gateway 복제본
+    replicaCount: 2
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: istio-ingressgateway
+              topologyKey: kubernetes.io/hostname
     ports:
       - port: 80
         targetPort: 8080
@@ -17,4 +31,18 @@ gateways:
     serviceAnnotations: {}
 
 pilot:
+  # High Availability: Istiod (Control Plane) 복제본
+  replicaCount: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: istiod
+            topologyKey: kubernetes.io/hostname
   autoscaleEnabled: false

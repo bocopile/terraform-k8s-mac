@@ -1,4 +1,22 @@
-replicas: 1
+# High Availability: 복제본 2개로 SPOF 제거
+replicas: 2
+
+# Pod Disruption Budget 설정
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Anti-affinity로 서로 다른 노드에 배치
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: kube-state-metrics
+          topologyKey: kubernetes.io/hostname
+
 resources:
   requests:
     cpu: 100m
@@ -6,5 +24,6 @@ resources:
   limits:
     cpu: 300m
     memory: 256Mi
+
 selfMonitor:
   enabled: true
