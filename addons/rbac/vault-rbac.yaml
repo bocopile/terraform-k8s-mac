@@ -1,0 +1,168 @@
+---
+# Vault ServiceAccount
+# 목적: Vault Pod가 사용할 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault
+  namespace: vault
+  labels:
+    app: vault
+    managed-by: terraform
+
+---
+# Vault ClusterRole - Kubernetes Auth Backend
+# 목적: Vault가 Kubernetes Auth를 통해 인증할 수 있도록 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-auth
+  labels:
+    app: vault
+    managed-by: terraform
+rules:
+  # ServiceAccount Token Review (인증)
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+
+  # ServiceAccount 정보 조회
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod 정보 조회 (ServiceAccount 검증)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Namespace 정보 조회
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Vault ClusterRoleBinding
+# 목적: vault ServiceAccount에 Kubernetes Auth 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-auth-binding
+  labels:
+    app: vault
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-auth
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+
+---
+# Vault Role - Namespace 내 권한
+# 목적: vault 네임스페이스 내 리소스 관리
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-role
+  namespace: vault
+  labels:
+    app: vault
+    managed-by: terraform
+rules:
+  # ConfigMap 관리 (Vault 설정)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Secret 관리 (TLS 인증서, 초기 Unseal Key)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # PersistentVolumeClaim 관리 (Raft 스토리지)
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Service, Endpoints (Raft Cluster Discovery)
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod 정보 조회 (Raft Peer Discovery)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Lease 관리 (Coordination API)
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# Vault RoleBinding
+# 목적: vault ServiceAccount에 vault-role 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-rolebinding
+  namespace: vault
+  labels:
+    app: vault
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-role
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+
+---
+# Vault Injector ClusterRole - 시크릿 주입
+# 목적: Vault Agent Injector가 모든 네임스페이스의 Pod에 시크릿 주입
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-injector
+  labels:
+    app: vault
+    managed-by: terraform
+rules:
+  # MutatingWebhookConfiguration 관리
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Pod 정보 조회 (Inject 대상 확인)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # ServiceAccount 조회 (Vault Auth)
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Vault Injector ClusterRoleBinding
+# 목적: vault ServiceAccount에 Injector 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-injector-binding
+  labels:
+    app: vault
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-injector
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault

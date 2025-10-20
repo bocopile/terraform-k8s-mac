@@ -1,0 +1,163 @@
+---
+# ArgoCD ServiceAccount
+# 목적: ArgoCD Application Controller가 사용할 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-application-controller
+  namespace: argocd
+  labels:
+    app: argocd
+    managed-by: terraform
+
+---
+# ArgoCD Server ServiceAccount
+# 목적: ArgoCD Server (UI/API)가 사용할 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app: argocd
+    managed-by: terraform
+
+---
+# ArgoCD ClusterRole - Application 관리
+# 목적: ArgoCD가 모든 네임스페이스의 리소스를 배포/관리
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-application-controller
+  labels:
+    app: argocd
+    managed-by: terraform
+rules:
+  # 모든 리소스 관리 (GitOps 배포)
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # CRD 관리
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Namespace 관리
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+# ArgoCD ClusterRoleBinding - Application Controller
+# 목적: ArgoCD Controller에 전역 배포 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-application-controller
+  labels:
+    app: argocd
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-application-controller
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: argocd
+
+---
+# ArgoCD Server ClusterRole - 읽기 전용 (UI/API)
+# 목적: ArgoCD Server가 클러스터 상태를 조회 (읽기 전용)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-server
+  labels:
+    app: argocd
+    managed-by: terraform
+rules:
+  # 모든 리소스 읽기 (UI 표시용)
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+
+  # Application/AppProject CRD 관리
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "appprojects"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# ArgoCD Server ClusterRoleBinding
+# 목적: ArgoCD Server에 읽기 전용 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-server
+  labels:
+    app: argocd
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-server
+subjects:
+  - kind: ServiceAccount
+    name: argocd-server
+    namespace: argocd
+
+---
+# ArgoCD Role - Namespace 내 권한
+# 목적: argocd 네임스페이스 내 리소스 관리
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argocd-role
+  namespace: argocd
+  labels:
+    app: argocd
+    managed-by: terraform
+rules:
+  # ConfigMap 관리 (앱 설정)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Secret 관리 (Git credentials, SSH keys)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Service, Endpoints
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod 관리
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "delete"]
+
+---
+# ArgoCD RoleBinding
+# 목적: argocd 네임스페이스 내 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-rolebinding
+  namespace: argocd
+  labels:
+    app: argocd
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argocd-role
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: argocd
+  - kind: ServiceAccount
+    name: argocd-server
+    namespace: argocd

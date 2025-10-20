@@ -1,0 +1,123 @@
+---
+# SigNoz ServiceAccount
+# 목적: SigNoz 컴포넌트가 사용할 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: signoz
+  namespace: signoz
+  labels:
+    app: signoz
+    managed-by: terraform
+
+---
+# SigNoz Role - Namespace 내 최소 권한
+# 목적: SigNoz가 필요한 최소한의 권한만 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: signoz-role
+  namespace: signoz
+  labels:
+    app: signoz
+    managed-by: terraform
+rules:
+  # ConfigMap 읽기 (설정 파일)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Secret 읽기 (DB 비밀번호, API 키)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod 정보 조회 (메트릭 수집)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Service 정보 조회
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+
+  # Endpoints 조회 (서비스 디스커버리)
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+
+---
+# SigNoz RoleBinding
+# 목적: signoz ServiceAccount에 signoz-role 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: signoz-rolebinding
+  namespace: signoz
+  labels:
+    app: signoz
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: signoz-role
+subjects:
+  - kind: ServiceAccount
+    name: signoz
+    namespace: signoz
+
+---
+# SigNoz ClusterRole - 클러스터 전역 메트릭 수집
+# 목적: 모든 네임스페이스의 메트릭/로그 수집
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: signoz-metrics-reader
+  labels:
+    app: signoz
+    managed-by: terraform
+rules:
+  # 모든 네임스페이스의 Pod 메트릭 수집
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+
+  # 모든 네임스페이스의 Service 조회
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # 모든 네임스페이스의 Node 메트릭 수집
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/stats", "nodes/metrics"]
+    verbs: ["get", "list", "watch"]
+
+  # Deployment, ReplicaSet 정보 조회
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+
+  # Namespace 정보 조회
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+
+---
+# SigNoz ClusterRoleBinding
+# 목적: signoz ServiceAccount에 클러스터 전역 메트릭 수집 권한 부여
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: signoz-metrics-reader-binding
+  labels:
+    app: signoz
+    managed-by: terraform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: signoz-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: signoz
+    namespace: signoz
