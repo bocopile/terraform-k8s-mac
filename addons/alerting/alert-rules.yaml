@@ -1,0 +1,361 @@
+---
+# Prometheus Alert Rules
+# 목적: 인프라, 애플리케이션, 데이터베이스 알림 규칙 정의
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: signoz
+  labels:
+    app: prometheus
+    managed-by: terraform
+data:
+  alert-rules.yml: |
+    groups:
+      # ============================================================
+      # 인프라 알림
+      # ============================================================
+      - name: infrastructure
+        interval: 30s
+        rules:
+          # Node Down
+          - alert: NodeDown
+            expr: up{job="node-exporter"} == 0
+            for: 1m
+            labels:
+              severity: critical
+              category: infrastructure
+            annotations:
+              summary: "Node {{ $labels.instance }} is down"
+              description: "Node {{ $labels.instance }} has been down for more than 1 minute."
+
+          # High CPU Usage
+          - alert: HighCPUUsage
+            expr: |
+              100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+              category: infrastructure
+            annotations:
+              summary: "High CPU usage on {{ $labels.instance }}"
+              description: "CPU usage is above 80% (current: {{ $value | humanize }}%)"
+
+          # Critical High CPU Usage
+          - alert: CriticalHighCPUUsage
+            expr: |
+              100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+            for: 2m
+            labels:
+              severity: critical
+              category: infrastructure
+            annotations:
+              summary: "CRITICAL: CPU usage on {{ $labels.instance }}"
+              description: "CPU usage is above 95% (current: {{ $value | humanize }}%)"
+
+          # High Memory Usage
+          - alert: HighMemoryUsage
+            expr: |
+              (1 - (node_memory_AvailableBytes / node_memory_MemTotal_bytes)) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+              category: infrastructure
+            annotations:
+              summary: "High memory usage on {{ $labels.instance }}"
+              description: "Memory usage is above 85% (current: {{ $value | humanize }}%)"
+
+          # Critical High Memory Usage
+          - alert: CriticalHighMemoryUsage
+            expr: |
+              (1 - (node_memory_AvailableBytes / node_memory_MemTotal_bytes)) * 100 > 95
+            for: 2m
+            labels:
+              severity: critical
+              category: infrastructure
+            annotations:
+              summary: "CRITICAL: Memory usage on {{ $labels.instance }}"
+              description: "Memory usage is above 95% (current: {{ $value | humanize }}%)"
+
+          # Disk Space Warning
+          - alert: DiskSpaceWarning
+            expr: |
+              (1 - (node_filesystem_avail_bytes{fstype=~"ext4|xfs"} / node_filesystem_size_bytes)) * 100 > 80
+            for: 5m
+            labels:
+              severity: warning
+              category: infrastructure
+            annotations:
+              summary: "Disk space low on {{ $labels.instance }}"
+              description: "Disk {{ $labels.mountpoint }} usage is above 80% (current: {{ $value | humanize }}%)"
+
+          # Disk Space Critical
+          - alert: DiskSpaceCritical
+            expr: |
+              (1 - (node_filesystem_avail_bytes{fstype=~"ext4|xfs"} / node_filesystem_size_bytes)) * 100 > 90
+            for: 2m
+            labels:
+              severity: critical
+              category: infrastructure
+            annotations:
+              summary: "CRITICAL: Disk space on {{ $labels.instance }}"
+              description: "Disk {{ $labels.mountpoint }} usage is above 90% (current: {{ $value | humanize }}%)"
+
+      # ============================================================
+      # Kubernetes 알림
+      # ============================================================
+      - name: kubernetes
+        interval: 30s
+        rules:
+          # Pod Crash Looping
+          - alert: PodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total[15m]) > 0
+            for: 5m
+            labels:
+              severity: critical
+              category: kubernetes
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+              description: "Pod has restarted {{ $value | humanize }} times in the last 15 minutes."
+
+          # Pod Not Ready
+          - alert: PodNotReady
+            expr: |
+              kube_pod_status_phase{phase!~"Running|Succeeded"} > 0
+            for: 5m
+            labels:
+              severity: warning
+              category: kubernetes
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
+              description: "Pod is in {{ $labels.phase }} state for more than 5 minutes."
+
+          # Deployment Replicas Mismatch
+          - alert: DeploymentReplicasMismatch
+            expr: |
+              kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+            for: 5m
+            labels:
+              severity: warning
+              category: kubernetes
+            annotations:
+              summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} replicas mismatch"
+              description: "Desired replicas ({{ $value }}) != Available replicas"
+
+          # StatefulSet Replicas Mismatch
+          - alert: StatefulSetReplicasMismatch
+            expr: |
+              kube_statefulset_status_replicas != kube_statefulset_status_replicas_ready
+            for: 5m
+            labels:
+              severity: warning
+              category: kubernetes
+            annotations:
+              summary: "StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} replicas mismatch"
+              description: "Not all replicas are ready"
+
+          # DaemonSet Missing Pods
+          - alert: DaemonSetMissingPods
+            expr: |
+              kube_daemonset_status_desired_number_scheduled - kube_daemonset_status_number_available > 0
+            for: 5m
+            labels:
+              severity: warning
+              category: kubernetes
+            annotations:
+              summary: "DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} missing pods"
+              description: "{{ $value }} pods are missing"
+
+          # Job Failed
+          - alert: JobFailed
+            expr: |
+              kube_job_status_failed > 0
+            for: 1m
+            labels:
+              severity: warning
+              category: kubernetes
+            annotations:
+              summary: "Job {{ $labels.namespace }}/{{ $labels.job_name }} failed"
+              description: "Job has failed"
+
+          # PersistentVolume Claim Pending
+          - alert: PVCPending
+            expr: |
+              kube_persistentvolumeclaim_status_phase{phase="Pending"} > 0
+            for: 5m
+            labels:
+              severity: warning
+              category: kubernetes
+            annotations:
+              summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} pending"
+              description: "PVC is in Pending state for more than 5 minutes"
+
+      # ============================================================
+      # 애플리케이션 알림
+      # ============================================================
+      - name: application
+        interval: 30s
+        rules:
+          # High Error Rate
+          - alert: HighErrorRate
+            expr: |
+              (sum(rate(http_requests_total{status=~"5.."}[5m])) by (namespace, pod) /
+               sum(rate(http_requests_total[5m])) by (namespace, pod)) * 100 > 5
+            for: 5m
+            labels:
+              severity: warning
+              category: application
+            annotations:
+              summary: "High error rate in {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "Error rate is {{ $value | humanize }}% (threshold: 5%)"
+
+          # Critical High Error Rate
+          - alert: CriticalHighErrorRate
+            expr: |
+              (sum(rate(http_requests_total{status=~"5.."}[5m])) by (namespace, pod) /
+               sum(rate(http_requests_total[5m])) by (namespace, pod)) * 100 > 10
+            for: 2m
+            labels:
+              severity: critical
+              category: application
+            annotations:
+              summary: "CRITICAL: Error rate in {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "Error rate is {{ $value | humanize }}% (threshold: 10%)"
+
+          # High Latency
+          - alert: HighLatency
+            expr: |
+              histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, namespace, pod)) > 2
+            for: 5m
+            labels:
+              severity: warning
+              category: application
+            annotations:
+              summary: "High latency in {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "P95 latency is {{ $value | humanize }}s (threshold: 2s)"
+
+          # Container OOMKilled
+          - alert: ContainerOOMKilled
+            expr: |
+              (kube_pod_container_status_terminated_reason{reason="OOMKilled"} == 1)
+            for: 1m
+            labels:
+              severity: critical
+              category: application
+            annotations:
+              summary: "Container OOMKilled in {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "Container {{ $labels.container }} was killed due to OOM"
+
+      # ============================================================
+      # 데이터베이스 알림
+      # ============================================================
+      - name: database
+        interval: 30s
+        rules:
+          # MySQL Down
+          - alert: MySQLDown
+            expr: mysql_up == 0
+            for: 1m
+            labels:
+              severity: critical
+              category: database
+            annotations:
+              summary: "MySQL instance {{ $labels.instance }} is down"
+              description: "MySQL has been down for more than 1 minute"
+
+          # MySQL Slow Queries
+          - alert: MySQLSlowQueries
+            expr: rate(mysql_global_status_slow_queries[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+              category: database
+            annotations:
+              summary: "MySQL slow queries on {{ $labels.instance }}"
+              description: "Slow query rate is {{ $value | humanize }} queries/sec"
+
+          # MySQL Replication Lag
+          - alert: MySQLReplicationLag
+            expr: mysql_slave_status_seconds_behind_master > 30
+            for: 5m
+            labels:
+              severity: warning
+              category: database
+            annotations:
+              summary: "MySQL replication lag on {{ $labels.instance }}"
+              description: "Replication lag is {{ $value | humanize }} seconds (threshold: 30s)"
+
+          # PostgreSQL Down
+          - alert: PostgreSQLDown
+            expr: pg_up == 0
+            for: 1m
+            labels:
+              severity: critical
+              category: database
+            annotations:
+              summary: "PostgreSQL instance {{ $labels.instance }} is down"
+              description: "PostgreSQL has been down for more than 1 minute"
+
+          # Redis Down
+          - alert: RedisDown
+            expr: redis_up == 0
+            for: 1m
+            labels:
+              severity: critical
+              category: database
+            annotations:
+              summary: "Redis instance {{ $labels.instance }} is down"
+              description: "Redis has been down for more than 1 minute"
+
+          # Redis High Memory Usage
+          - alert: RedisHighMemoryUsage
+            expr: |
+              (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+            for: 5m
+            labels:
+              severity: warning
+              category: database
+            annotations:
+              summary: "Redis high memory usage on {{ $labels.instance }}"
+              description: "Memory usage is {{ $value | humanize }}% (threshold: 90%)"
+
+      # ============================================================
+      # SigNoz 자체 모니터링
+      # ============================================================
+      - name: signoz
+        interval: 30s
+        rules:
+          # SigNoz Collector Down
+          - alert: SigNozCollectorDown
+            expr: up{job="signoz-otel-collector"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              category: signoz
+            annotations:
+              summary: "SigNoz OTEL Collector is down"
+              description: "OTEL Collector has been down for more than 2 minutes"
+
+          # ClickHouse Down
+          - alert: ClickHouseDown
+            expr: up{job="clickhouse"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              category: signoz
+            annotations:
+              summary: "ClickHouse is down"
+              description: "ClickHouse database has been down for more than 2 minutes"
+
+          # High Query Latency
+          - alert: HighClickHouseQueryLatency
+            expr: |
+              histogram_quantile(0.95, sum(rate(clickhouse_query_duration_seconds_bucket[5m])) by (le)) > 5
+            for: 5m
+            labels:
+              severity: warning
+              category: signoz
+            annotations:
+              summary: "High ClickHouse query latency"
+              description: "P95 query latency is {{ $value | humanize }}s (threshold: 5s)"

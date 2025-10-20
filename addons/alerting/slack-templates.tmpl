@@ -1,0 +1,129 @@
+{{ define "slack.default.title" }}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.default.text" }}
+{{ range .Alerts }}
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity }}
+{{ if .Labels.namespace }}*Namespace:* {{ .Labels.namespace }}{{ end }}
+{{ if .Labels.pod }}*Pod:* {{ .Labels.pod }}{{ end }}
+{{ if .Labels.instance }}*Instance:* {{ .Labels.instance }}{{ end }}
+{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}
+{{ if .Annotations.description }}*Description:* {{ .Annotations.description }}{{ end }}
+*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+{{ if .EndsAt }}*Ended:* {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.critical.title" }}
+🚨 CRITICAL: {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.critical.text" }}
+{{ range .Alerts }}
+⚠️ *CRITICAL ALERT*
+
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity | toUpper }}
+
+{{ if .Labels.namespace }}📦 *Namespace:* {{ .Labels.namespace }}{{ end }}
+{{ if .Labels.pod }}🐳 *Pod:* {{ .Labels.pod }}{{ end }}
+{{ if .Labels.container }}📦 *Container:* {{ .Labels.container }}{{ end }}
+{{ if .Labels.node }}🖥️ *Node:* {{ .Labels.node }}{{ end }}
+{{ if .Labels.instance }}🌐 *Instance:* {{ .Labels.instance }}{{ end }}
+
+{{ if .Annotations.summary }}📝 *Summary:*
+{{ .Annotations.summary }}{{ end }}
+
+{{ if .Annotations.description }}📄 *Description:*
+{{ .Annotations.description }}{{ end }}
+
+⏰ *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+{{ if .EndsAt }}✅ *Resolved:* {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}
+
+🔗 <http://signoz.local:3301/alerts|View in SigNoz>
+{{ end }}
+{{ end }}
+
+{{ define "slack.warning.title" }}
+⚠️ WARNING: {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.warning.text" }}
+{{ range .Alerts }}
+⚠️ *WARNING*
+
+*Alert:* {{ .Labels.alertname }}
+{{ if .Labels.namespace }}*Namespace:* {{ .Labels.namespace }}{{ end }}
+{{ if .Labels.pod }}*Pod:* {{ .Labels.pod }}{{ end }}
+
+{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}
+
+*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.infra.title" }}
+🖥️ INFRA: {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.infra.text" }}
+{{ range .Alerts }}
+🖥️ *Infrastructure Alert*
+
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity }}
+{{ if .Labels.node }}*Node:* {{ .Labels.node }}{{ end }}
+{{ if .Labels.instance }}*Instance:* {{ .Labels.instance }}{{ end }}
+
+{{ if .Annotations.summary }}*Summary:*
+{{ .Annotations.summary }}{{ end }}
+
+{{ if .Annotations.description }}*Description:*
+{{ .Annotations.description }}{{ end }}
+
+*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.app.title" }}
+📱 APP: {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.app.text" }}
+{{ range .Alerts }}
+📱 *Application Alert*
+
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity }}
+{{ if .Labels.namespace }}*Namespace:* {{ .Labels.namespace }}{{ end }}
+{{ if .Labels.pod }}*Pod:* {{ .Labels.pod }}{{ end }}
+
+{{ if .Annotations.summary }}*Summary:*
+{{ .Annotations.summary }}{{ end }}
+
+*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.database.title" }}
+💾 DATABASE: {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.database.text" }}
+{{ range .Alerts }}
+💾 *Database Alert*
+
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity }}
+{{ if .Labels.database }}*Database:* {{ .Labels.database }}{{ end }}
+{{ if .Labels.namespace }}*Namespace:* {{ .Labels.namespace }}{{ end }}
+{{ if .Labels.instance }}*Instance:* {{ .Labels.instance }}{{ end }}
+
+{{ if .Annotations.summary }}*Summary:*
+{{ .Annotations.summary }}{{ end }}
+
+*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+{{ end }}
+{{ end }}
