@@ -22,9 +22,10 @@ variable "redis_port" {
 }
 
 variable "redis_password" {
-  type      = string
-  sensitive = true
-  default   = "redispass"
+  type        = string
+  sensitive   = true
+  description = "Redis 비밀번호 (환경변수 TF_VAR_redis_password 또는 .tfvars 파일에서 설정)"
+  # default 값 제거 - 반드시 외부에서 주입해야 함
 }
 
 variable "mysql_port" {
@@ -32,9 +33,10 @@ variable "mysql_port" {
 }
 
 variable "mysql_root_password" {
-  type      = string
-  sensitive = true
-  default   = "rootpass"
+  type        = string
+  sensitive   = true
+  description = "MySQL Root 비밀번호 (환경변수 TF_VAR_mysql_root_password 또는 .tfvars 파일에서 설정)"
+  # default 값 제거 - 반드시 외부에서 주입해야 함
 }
 
 variable "mysql_user" {
@@ -42,9 +44,10 @@ variable "mysql_user" {
 }
 
 variable "mysql_user_password" {
-  type      = string
-  sensitive = true
-  default   = "finalyzerpass"
+  type        = string
+  sensitive   = true
+  description = "MySQL 사용자 비밀번호 (환경변수 TF_VAR_mysql_user_password 또는 .tfvars 파일에서 설정)"
+  # default 값 제거 - 반드시 외부에서 주입해야 함
 }
 
 variable "mysql_database" {
@@ -58,12 +61,13 @@ variable "harbor_server" {
 }
 
 variable "harbor_user" {
-  type        = string
-  default     = "devops"
+  type    = string
+  default = "devops"
 }
 
 variable "harbor_password" {
   type        = string
   sensitive   = true
-  default     = "P@ssw0rd!"
+  description = "Harbor Registry 비밀번호 (환경변수 TF_VAR_harbor_password 또는 .tfvars 파일에서 설정)"
+  # default 값 제거 - 반드시 외부에서 주입해야 함
 }
