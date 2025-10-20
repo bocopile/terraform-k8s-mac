@@ -13,16 +13,25 @@
    ↓
 3. 로컬 테스트 실행
    ↓
-4. 테스트 통과 시 PR 생성
+4. 테스트 통과 시 PR 생성 (Draft PR)
    ↓
-5. 코드 리뷰
+5. 코드 리뷰 (선택사항)
    ↓
-6. PR 머지
+6. 통합 테스트 대기 (PR은 Draft 상태 유지)
    ↓
-7. JIRA 백로그 상태 "완료"로 변경
+7. 통합 테스트 완료 후:
+   - PR Draft → Ready for Review
+   - PR Approve 및 Merge
+   - JIRA 백로그 상태 "완료"로 변경
    ↓
 8. 브랜치 정리
 ```
+
+**⚠️ 중요 변경사항**:
+- PR은 생성하되 **Draft 상태**로 유지
+- 통합 테스트 완료 전까지 **PR Merge 금지**
+- 통합 테스트 완료 전까지 **JIRA 완료 처리 금지**
+- 모든 백로그의 통합 테스트가 완료된 후 일괄 처리
 
 ---
 
@@ -241,28 +250,42 @@ curl -X POST \
   "$JIRA_BASE_URL/rest/api/3/issue/$ISSUE_KEY/comment"
 ```
 
-### 4.2 PR 생성 확인
+### 4.2 Draft PR 생성 (⚠️ 변경됨)
 
-브랜치가 이미 푸시되어 있다면 GitHub에서 PR 생성:
+**중요**: 통합 테스트 완료 전까지 **Draft PR**로 생성합니다.
 
 **PR이 없는 경우**:
 ```bash
-# GitHub CLI 사용
+# GitHub CLI로 Draft PR 생성
 gh pr create \
+  --draft \
   --title "[TERRAFORM-XX] 기능 설명" \
   --body "$(cat <<'EOF'
+## ⚠️ 통합 테스트 대기 중
+
+이 PR은 통합 테스트 완료 전까지 Draft 상태로 유지됩니다.
+
 ## 변경 사항
 - 주요 변경 내용 1
 - 주요 변경 내용 2
 
-## 테스트 결과
+## 로컬 테스트 결과
 - [x] terraform validate 통과
 - [x] terraform plan 확인
 - [x] 로컬 테스트 완료
 - [x] 문서 업데이트
 
+## 통합 테스트 상태
+- [ ] 전체 클러스터 배포 테스트
+- [ ] 애드온 간 상호작용 테스트
+- [ ] 성능 및 리소스 사용량 확인
+- [ ] 재해 복구 시나리오 테스트
+
 ## 관련 이슈
 - JIRA: [TERRAFORM-XX](https://gjrjr4545.atlassian.net/browse/TERRAFORM-XX)
+
+---
+**통합 테스트 완료 후 Ready for Review로 전환됩니다.**
 EOF
 )"
 ```
@@ -272,8 +295,11 @@ EOF
 # PR 목록 확인
 gh pr list
 
-# PR 상세 확인
+# Draft 상태 확인
 gh pr view TERRAFORM-XX-feature-name
+
+# 필요시 Draft로 변경
+gh pr ready --undo TERRAFORM-XX-feature-name
 ```
 
 ---
@@ -321,12 +347,90 @@ git push origin TERRAFORM-XX-feature-name
 
 ---
 
-## 6. PR 머지
+## 6. 통합 테스트 및 최종 승인 (⚠️ 신규 추가)
 
-### 6.1 머지 조건 확인
+### 6.1 통합 테스트 절차
+
+모든 Draft PR에 대해 통합 테스트 수행:
+
+```bash
+# 1. 통합 테스트 환경 준비
+terraform destroy  # 기존 환경 정리
+terraform apply    # 전체 클러스터 재배포
+
+# 2. 모든 애드온 배포
+kubectl apply -f addons/
+
+# 3. 통합 테스트 실행
+./tests/integration-test.sh
+
+# 4. 테스트 항목 확인
+```
+
+**통합 테스트 체크리스트**:
+- [ ] 전체 클러스터 정상 배포 (masters + workers)
+- [ ] 모든 애드온 Pod Running 상태
+- [ ] 고가용성 설정 동작 확인 (replicas, PDB, affinity)
+- [ ] 데이터 영속성 확인 (PVC 바인딩, reclaimPolicy)
+- [ ] 보안 설정 확인 (SecurityContext, mTLS, NetworkPolicy)
+- [ ] 애드온 간 통신 정상 (OTEL → SigNoz, ArgoCD → K8s API)
+- [ ] 외부 접근 가능 (LoadBalancer, Ingress)
+- [ ] 리소스 사용량 적정 (CPU, Memory, Disk)
+- [ ] 로그에 Critical/Error 없음
+- [ ] 성능 테스트 통과
+
+### 6.2 통합 테스트 완료 후 처리
+
+**모든 통합 테스트가 통과한 경우**:
+
+```bash
+# 1. Draft PR을 Ready for Review로 전환
+gh pr ready <PR-번호>
+
+# 2. PR 승인
+gh pr review <PR-번호> --approve
+
+# 3. PR 머지
+gh pr merge <PR-번호> --squash --delete-branch
+
+# 4. JIRA 백로그 상태 "완료"로 변경
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+  -d '{"transition":{"id":"31"}}' \
+  "$JIRA_BASE_URL/rest/api/3/issue/TERRAFORM-XX/transitions"
+```
+
+**통합 테스트 실패 시**:
+
+```bash
+# 1. 실패 원인 파악
+kubectl get pods -A | grep -v Running
+kubectl logs -n <namespace> <pod-name>
+
+# 2. JIRA에 실패 코멘트 추가
+# 3. 브랜치로 돌아가서 수정
+git checkout TERRAFORM-XX-feature-name
+
+# 4. 수정 후 다시 테스트
+git commit -m "[TERRAFORM-XX] fix: 통합 테스트 실패 수정"
+git push
+
+# 5. 통합 테스트 재실행
+```
+
+---
+
+## 7. PR 머지 (⚠️ 변경됨)
+
+### 7.1 머지 조건 확인
+
+⚠️ **통합 테스트 완료 후에만 머지 가능**
 
 다음 조건을 모두 만족해야 머지 가능:
-- [ ] 최소 1명 이상의 승인
+- [ ] **통합 테스트 모두 통과** (필수!)
+- [ ] PR이 Draft에서 Ready for Review로 전환됨
+- [ ] 최소 1명 이상의 승인 (선택사항)
 - [ ] 모든 대화 해결됨
 - [ ] CI/CD 통과 (GitHub Actions)
 - [ ] 충돌 없음

@@ -60,39 +60,60 @@ curl -X POST \
 
 ---
 
-## ✅ PR 생성 및 머지
+## ✅ Draft PR 생성 (⚠️ 변경됨)
 
 ```bash
-# PR 생성 (GitHub CLI)
+# Draft PR 생성 (통합 테스트 전)
 gh pr create \
+  --draft \
   --title "[TERRAFORM-XX] 기능 설명" \
   --body "$(cat <<'EOF'
+## ⚠️ 통합 테스트 대기 중
+
 ## 변경 사항
 - 변경 내용 1
 - 변경 내용 2
 
-## 테스트 결과
+## 로컬 테스트 결과
 - [x] terraform validate 통과
 - [x] terraform plan 확인
 - [x] 로컬 테스트 완료
+
+## 통합 테스트 상태
+- [ ] 전체 클러스터 배포 테스트
+- [ ] 애드온 간 상호작용 테스트
+- [ ] 성능 및 리소스 사용량 확인
 
 ## 관련 이슈
 - JIRA: [TERRAFORM-XX](https://gjrjr4545.atlassian.net/browse/TERRAFORM-XX)
 EOF
 )"
-
-# PR 머지 (리뷰 완료 후)
-gh pr merge TERRAFORM-XX-feature-description --squash --delete-branch
 ```
 
-**JIRA 완료 처리**:
+## 🧪 통합 테스트 및 최종 승인 (⚠️ 신규 추가)
+
 ```bash
+# 1. 통합 테스트 실행
+terraform destroy && terraform apply
+kubectl apply -f addons/
+./tests/integration-test.sh
+
+# 2. 통합 테스트 통과 후 Draft → Ready
+gh pr ready <PR-번호>
+
+# 3. PR 승인 및 머지
+gh pr review <PR-번호> --approve
+gh pr merge <PR-번호> --squash --delete-branch
+
+# 4. JIRA 완료 처리 (통합 테스트 통과 후에만!)
 curl -X POST \
   -H "Content-Type: application/json" \
   -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
   -d '{"transition":{"id":"31"}}' \
   "$JIRA_BASE_URL/rest/api/3/issue/TERRAFORM-XX/transitions"
 ```
+
+⚠️ **중요**: PR 머지와 JIRA 완료는 **통합 테스트 완료 후에만** 수행!
 
 ---
 
