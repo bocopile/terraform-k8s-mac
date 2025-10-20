@@ -1,0 +1,159 @@
+---
+# Alertmanager ConfigMap
+# 목적: 알림 라우팅 및 수신자 설정
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: signoz
+  labels:
+    app: alertmanager
+    managed-by: terraform
+data:
+  alertmanager.yml: |
+    # 전역 설정
+    global:
+      resolve_timeout: 5m
+      # Slack Webhook URL (환경변수로 주입)
+      slack_api_url: '{{ .SlackWebhookURL }}'
+
+    # 템플릿
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+
+    # 라우팅 트리
+    route:
+      # 기본 수신자
+      receiver: 'default'
+
+      # 그룹화 기준 (동일한 알림을 묶음)
+      group_by: ['alertname', 'cluster', 'namespace', 'severity']
+
+      # 그룹 대기 시간 (첫 알림 발생 후 대기)
+      group_wait: 30s
+
+      # 그룹 간격 (동일 그룹의 연속 알림 간격)
+      group_interval: 5m
+
+      # 반복 간격 (해결되지 않은 알림 재전송)
+      repeat_interval: 4h
+
+      # 하위 라우트
+      routes:
+        # Critical 알림 → Slack + Email
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+          group_wait: 10s
+          group_interval: 1m
+          repeat_interval: 1h
+
+        # Warning 알림 → Slack
+        - match:
+            severity: warning
+          receiver: 'warning-alerts'
+          group_interval: 5m
+          repeat_interval: 4h
+
+        # 인프라 알림 (Node, Disk)
+        - match_re:
+            alertname: ^(NodeDown|DiskSpaceWarning|DiskSpaceCritical|HighCPUUsage|HighMemoryUsage)$
+          receiver: 'infra-alerts'
+          group_wait: 30s
+          group_interval: 5m
+
+        # 애플리케이션 알림
+        - match_re:
+            alertname: ^(HighErrorRate|HighLatency|PodCrashLooping|DeploymentReplicasMismatch)$
+          receiver: 'app-alerts'
+          group_interval: 5m
+
+        # 데이터베이스 알림
+        - match_re:
+            alertname: ^(DatabaseDown|SlowQueries|ConnectionPoolExhausted)$
+          receiver: 'database-alerts'
+          group_interval: 5m
+
+    # 억제 규칙 (상위 알림 발생 시 하위 알림 억제)
+    inhibit_rules:
+      # Critical 발생 시 Warning 억제
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'namespace', 'pod']
+
+      # Node Down 시 Pod 알림 억제
+      - source_match:
+          alertname: 'NodeDown'
+        target_match_re:
+          alertname: '^(PodCrashLooping|PodNotReady)$'
+        equal: ['node']
+
+    # 수신자 설정
+    receivers:
+      # 기본 수신자 (테스트용)
+      - name: 'default'
+        webhook_configs:
+          - url: 'http://localhost:5001/webhook'
+            send_resolved: true
+
+      # Critical 알림 → Slack + Email
+      - name: 'critical-alerts'
+        slack_configs:
+          - channel: '#alerts-critical'
+            title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Description:* {{ .CommonAnnotations.description }}
+              *Severity:* {{ .CommonLabels.severity }}
+              *Namespace:* {{ .CommonLabels.namespace }}
+              *Pod:* {{ .CommonLabels.pod }}
+            send_resolved: true
+            actions:
+              - type: button
+                text: 'View in SigNoz'
+                url: 'http://signoz.local:3301/alerts'
+
+      # Warning 알림 → Slack
+      - name: 'warning-alerts'
+        slack_configs:
+          - channel: '#alerts-warning'
+            title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Namespace:* {{ .CommonLabels.namespace }}
+            send_resolved: true
+
+      # 인프라 알림 → Slack (인프라 전용 채널)
+      - name: 'infra-alerts'
+        slack_configs:
+          - channel: '#alerts-infra'
+            title: '🖥️ INFRA: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Node:* {{ .CommonLabels.node }}
+              *Instance:* {{ .CommonLabels.instance }}
+            send_resolved: true
+
+      # 애플리케이션 알림 → Slack (앱 전용 채널)
+      - name: 'app-alerts'
+        slack_configs:
+          - channel: '#alerts-app'
+            title: '📱 APP: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Namespace:* {{ .CommonLabels.namespace }}
+              *Pod:* {{ .CommonLabels.pod }}
+            send_resolved: true
+
+      # 데이터베이스 알림 → Slack (DB 전용 채널)
+      - name: 'database-alerts'
+        slack_configs:
+          - channel: '#alerts-database'
+            title: '💾 DATABASE: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Database:* {{ .CommonLabels.database }}
+              *Namespace:* {{ .CommonLabels.namespace }}
+            send_resolved: true
