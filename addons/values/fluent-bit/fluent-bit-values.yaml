@@ -1,36 +1,124 @@
+# Fluent Bit 로그 수집 설정
+# 목적: 모든 Pod 로그를 수집하여 SigNoz로 전송
+
+# 리소스 제한
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# 모든 노드에 배포 (로그 수집)
 tolerations:
   - operator: Exists
 
+# ServiceAccount 생성
 serviceAccount:
   create: true
+  name: fluent-bit
 
+# 입력 소스: Container 로그
 inputs:
   tail:
     enabled: true
     path: /var/log/containers/*.log
     parser: docker
+    tag: kube.*
     memBufLimit: 50MB
     skipLongLines: true
     refreshInterval: 5
+    db: /var/fluent-bit/state/flb_kube.db
+    dbSync: normal
     multiline:
       enabled: true
 
+# 출력: SigNoz OTEL Collector
 outputs:
   otlp:
     enabled: true
-    host: signoz-otel-collector
+    host: signoz-otel-collector.signoz.svc.cluster.local
     port: 4318
+    protocol: http
     tls:
       enabled: false
-    # attribute mapping to resource
+    # Retry 설정
+    retry:
+      limit: 3
+    # Attribute 매핑
     logAttributes:
       k8s.cluster.name: local-multipass
+      environment: production
 
+# 필터: Kubernetes 메타데이터 추가
 filters:
   kubernetes:
     enabled: true
     kubeURL: https://kubernetes.default.svc:443
+    kubeCAFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    kubeTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     mergeLog: true
     keepLog: true
     labels: true
     annotations: true
+    k8sLoggingParser: true
+    k8sLoggingExclude: true
+    bufferSize: 32k
+    # Namespace/Pod 메타데이터 추가
+    useKubelet: true
+    kubeletPort: 10250
+
+# 로그 레벨
+logLevel: info
+
+# 보안 설정
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# 모니터링
+service:
+  type: ClusterIP
+  port: 2020
+  labels:
+    app: fluent-bit
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "2020"
+    prometheus.io/path: /api/v1/metrics/prometheus
+
+# 고가용성 설정
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
+# 헬스체크
+livenessProbe:
+  httpGet:
+    path: /
+    port: 2020
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: 2020
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
