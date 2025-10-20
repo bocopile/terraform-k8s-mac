@@ -18,66 +18,74 @@ output "cluster_version" {
 
 output "master_nodes" {
   description = "List of master node names"
-  value = [
-    for i in range(var.masters) : "k8s-master-${i}"
-  ]
+  value       = module.k8s_cluster.master_nodes
 }
 
 output "worker_nodes" {
   description = "List of worker node names"
-  value = [
-    for i in range(var.workers) : "k8s-worker-${i}"
-  ]
+  value       = module.k8s_cluster.worker_nodes
 }
 
 output "master_count" {
   description = "Number of master nodes"
-  value       = var.masters
+  value       = module.k8s_cluster.master_count
 }
 
 output "worker_count" {
   description = "Number of worker nodes"
-  value       = var.workers
+  value       = module.k8s_cluster.worker_count
 }
 
 output "total_nodes" {
   description = "Total number of Kubernetes nodes"
-  value       = var.masters + var.workers
+  value       = module.k8s_cluster.total_nodes
 }
 
 # ============================================================
 # Database VM Outputs
 # ============================================================
 
+output "mysql_info" {
+  description = "MySQL database information"
+  value       = module.database.mysql_info
+  sensitive   = false
+}
+
+output "redis_info" {
+  description = "Redis database information"
+  value       = module.database.redis_info
+  sensitive   = false
+}
+
 output "mysql_vm_name" {
   description = "MySQL VM name"
-  value       = "mysql"
+  value       = module.database.mysql_info != null ? module.database.mysql_info.name : "N/A"
 }
 
 output "mysql_port" {
   description = "MySQL port"
-  value       = var.mysql_port
+  value       = module.database.mysql_info != null ? module.database.mysql_info.port : 0
 }
 
 output "mysql_database" {
   description = "MySQL database name"
-  value       = var.mysql_database
+  value       = module.database.mysql_info != null ? module.database.mysql_info.database : "N/A"
 }
 
 output "mysql_user" {
   description = "MySQL application user"
-  value       = var.mysql_user
+  value       = module.database.mysql_info != null ? module.database.mysql_info.user : "N/A"
   sensitive   = false
 }
 
 output "redis_vm_name" {
   description = "Redis VM name"
-  value       = "redis"
+  value       = module.database.redis_info != null ? module.database.redis_info.name : "N/A"
 }
 
 output "redis_port" {
   description = "Redis port"
-  value       = var.redis_port
+  value       = module.database.redis_info != null ? module.database.redis_info.port : 0
 }
 
 # ============================================================
