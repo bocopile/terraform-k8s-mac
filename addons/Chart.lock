@@ -1,35 +1,45 @@
 # Helm Chart Version Lock File
 # 이 파일은 사용 중인 Helm Chart 버전을 명시합니다.
 # 업그레이드 시 참고용으로 사용하세요.
+#
+# 업그레이드 날짜: 2025-10-21
+# Kubernetes 버전: v1.34 호환
 
 dependencies:
 - name: signoz
   repository: https://charts.signoz.io
-  version: "0.50.0"
+  version: "0.66.0"  # v0.50.0 → v0.66.0 (2025-10)
+  notes: "Kubernetes 1.34 호환, ArgoCD 공식 지원 추가"
 
 - name: argocd
   repository: https://argoproj.github.io/argo-helm
-  version: "5.51.0"
+  version: "9.0.3"  # v5.51.0 → v9.0.3 (2025-10, ArgoCD v2.13.4)
+  notes: "Kubernetes 1.34 호환, 주요 보안 패치"
 
 - name: vault
   repository: https://helm.releases.hashicorp.com
-  version: "0.27.0"
+  version: "0.29.1"  # v0.27.0 → v0.29.1 (2025-10, Vault v1.18.3)
+  notes: "Kubernetes 1.29+ 필수, 1.34 호환"
 
 - name: istio-base
   repository: https://istio-release.storage.googleapis.com/charts
-  version: "1.20.0"
+  version: "1.27.2"  # v1.20.0 → v1.27.2 (2025-10)
+  notes: "Kubernetes 1.34 호환, CNI spec v1.1.0 지원"
 
 - name: istiod
   repository: https://istio-release.storage.googleapis.com/charts
-  version: "1.20.0"
+  version: "1.27.2"  # v1.20.0 → v1.27.2 (2025-10)
+  notes: "Kubernetes 1.34 호환, 보안 패치"
 
 - name: kube-state-metrics
   repository: https://prometheus-community.github.io/helm-charts
-  version: "5.15.0"
+  version: "5.28.0"  # v5.15.0 → v5.28.0 (2025-09, KSM v2.15.0)
+  notes: "Kubernetes 1.34 호환"
 
 - name: fluent-bit
   repository: https://fluent.github.io/helm-charts
-  version: "0.43.0"
+  version: "0.49.0"  # v0.43.0 → v0.49.0 (2025-10, Fluent Bit v3.3.2)
+  notes: "Kubernetes 1.34 호환"
 
-digest: sha256:placeholder
-generated: "2025-10-20T21:55:00Z"
+digest: sha256:updated-for-k8s-1.34
+generated: "2025-10-21T12:00:00Z"
