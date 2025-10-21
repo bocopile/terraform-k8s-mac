@@ -49,3 +49,7 @@ secrets.env
 ./shell/join.sh
 
 # .claude/** - REMOVED: We want to commit workflow documentation
+# Terraform sensitive files
+terraform.tfvars
+*.tfstate*
+.terraform/
