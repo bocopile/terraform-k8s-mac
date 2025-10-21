@@ -1,0 +1,35 @@
+# Helm Chart Version Lock File
+# 이 파일은 사용 중인 Helm Chart 버전을 명시합니다.
+# 업그레이드 시 참고용으로 사용하세요.
+
+dependencies:
+- name: signoz
+  repository: https://charts.signoz.io
+  version: "0.50.0"
+
+- name: argocd
+  repository: https://argoproj.github.io/argo-helm
+  version: "5.51.0"
+
+- name: vault
+  repository: https://helm.releases.hashicorp.com
+  version: "0.27.0"
+
+- name: istio-base
+  repository: https://istio-release.storage.googleapis.com/charts
+  version: "1.20.0"
+
+- name: istiod
+  repository: https://istio-release.storage.googleapis.com/charts
+  version: "1.20.0"
+
+- name: kube-state-metrics
+  repository: https://prometheus-community.github.io/helm-charts
+  version: "5.15.0"
+
+- name: fluent-bit
+  repository: https://fluent.github.io/helm-charts
+  version: "0.43.0"
+
+digest: sha256:placeholder
+generated: "2025-10-20T21:55:00Z"
