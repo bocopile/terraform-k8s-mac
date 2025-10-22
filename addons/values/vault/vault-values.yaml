@@ -65,7 +65,7 @@ server:
     storageClass: local-path
 
   service:
-    type: LoadBalancer
+    type: ClusterIP  # ISTIO_EXPOSE=on 모드에서 Istio Ingress Gateway를 통해 노출
     annotations:
       external-dns.alpha.kubernetes.io/hostname: vault.bocopile.io
 

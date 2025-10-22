@@ -108,7 +108,13 @@ sudo APPLY_HOSTS=1 bash install.sh ~/kubeconfig
 sudo ISTIO_EXPOSE=off APPLY_HOSTS=1 bash install.sh ~/kubeconfig
 ```
 
-> Istio →  ArgoCD → Vault → Monitoring → Logging → Tracing → MetalLB 순으로 설치됩니다.  
+> **다음 순서로 애드온이 설치됩니다:**
+> 1. **Infrastructure**: MetalLB (LoadBalancer), Local Path Provisioner (Storage)
+> 2. **Service Mesh**: Istio Base, Istiod, Istio Ingress Gateway, Kiali
+> 3. **Platform**: ArgoCD (GitOps), Vault (Secrets Management)
+> 4. **Observability**: SigNoz (통합 Observability), Fluent Bit (로그), Kube-State-Metrics (메트릭)
+> 5. **Security**: Trivy Operator (취약점 스캔)
+>
 > 설치 후 host 파일을 추가해야 `*.bocopile.io` 형태의 로컬 도메인으로 각 서비스에 접속할 수 있습니다.
 
 ### 3. 설치 확인

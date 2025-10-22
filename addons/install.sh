@@ -32,6 +32,10 @@ DOMAINS=("signoz.bocopile.io" "argocd.bocopile.io" "kiali.bocopile.io" "vault.bo
 DOMAINS_REGEX='(signoz\.bocopile\.io|argocd\.bocopile\.io|kiali\.bocopile\.io|vault\.bocopile\.io)'
 HOSTS_FILE="hosts.generated"
 
+# 경로 설정
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
 ### 공통 함수
 need_cmd(){ command -v "$1" >/dev/null 2>&1 || { echo "[ERR] '$1' 명령이 필요합니다"; exit 1; }; }
 wait_svc_addr(){
@@ -79,6 +83,49 @@ need_cmd helm
 # 컨텍스트 확인
 kubectl config current-context >/dev/null || { echo "[ERR] kubeconfig 연결 불가"; exit 1; }
 
+### 0) MetalLB 설치 (LoadBalancer 지원)
+echo "[0] MetalLB 설치"
+kubectl get ns "$METALLB_NS" >/dev/null 2>&1 || kubectl create ns "$METALLB_NS"
+helm repo add metallb https://metallb.github.io/metallb >/dev/null 2>&1 || true
+helm repo update >/dev/null
+helm upgrade --install metallb metallb/metallb -n "$METALLB_NS"
+
+# MetalLB가 준비될 때까지 대기
+echo "[0] MetalLB Pod 준비 대기 중..."
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=metallb -n "$METALLB_NS" --timeout=180s || true
+
+# IPAddressPool 및 L2Advertisement 적용
+if [[ -f "${REPO_ROOT}/addons/values/metallb/metallb-config.yaml" ]]; then
+  echo "[0] MetalLB IPAddressPool 설정 적용"
+  kubectl apply -f "${REPO_ROOT}/addons/values/metallb/metallb-config.yaml"
+else
+  echo "[WARN] metallb-config.yaml 파일을 찾을 수 없습니다."
+fi
+
+### 0.5) Local Path Provisioner 설치 (PVC 지원)
+echo "[0.5] Local Path Provisioner 설치"
+kubectl get ns "$LOCALPATH_NS" >/dev/null 2>&1 || kubectl create ns "$LOCALPATH_NS"
+helm repo add local-path-provisioner https://charts.rancher.io >/dev/null 2>&1 || true
+helm repo update >/dev/null
+if [[ -f "${REPO_ROOT}/addons/values/rancher/local-path.yaml" ]]; then
+  helm upgrade --install my-local-path-provisioner local-path-provisioner/local-path-provisioner \
+    -n "$LOCALPATH_NS" \
+    -f "${REPO_ROOT}/addons/values/rancher/local-path.yaml"
+else
+  echo "[WARN] local-path.yaml 파일을 찾을 수 없어 기본 설정으로 설치합니다."
+  helm upgrade --install my-local-path-provisioner local-path-provisioner/local-path-provisioner \
+    -n "$LOCALPATH_NS"
+fi
+
+# Provisioner가 준비될 때까지 대기
+echo "[0.5] Local Path Provisioner Pod 준비 대기 중..."
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=local-path-provisioner \
+  -n "$LOCALPATH_NS" --timeout=120s || true
+
+# StorageClass 확인
+echo "[0.5] StorageClass 확인..."
+kubectl get storageclass local-path || echo "[WARN] local-path StorageClass가 생성되지 않았습니다."
+
 ### 1) Istio 설치/업그레이드 (base/istiod)
 echo "[1] Istio(base/istiod) 설치/업그레이드"
 kubectl get ns "$ISTIO_NS" >/dev/null 2>&1 || kubectl create ns "$ISTIO_NS"
@@ -86,6 +133,18 @@ helm repo add istio https://istio-release.storage.googleapis.com/charts >/dev/nu
 helm repo update >/dev/null
 helm upgrade --install istio-base istio/base -n "$ISTIO_NS"
 helm upgrade --install istiod istio/istiod -n "$ISTIO_NS"
+
+### 1.5) Kiali 설치 (Service Mesh 모니터링)
+echo "[1.5] Kiali 설치"
+helm repo add kiali https://kiali.org/helm-charts >/dev/null 2>&1 || true
+helm repo update >/dev/null
+if [[ -f "${REPO_ROOT}/addons/values/tracing/kiali-values.yaml" ]]; then
+  helm upgrade --install kiali kiali/kiali-server -n "$ISTIO_NS" \
+    -f "${REPO_ROOT}/addons/values/tracing/kiali-values.yaml"
+else
+  echo "[WARN] kiali-values.yaml 파일을 찾을 수 없어 기본 설정으로 설치합니다."
+  helm upgrade --install kiali kiali/kiali-server -n "$ISTIO_NS"
+fi
 
 ### 2) Ingress (on이면 LB, off면 ClusterIP로 유지)
 echo "[2] Istio Ingress 설정 (ISTIO_EXPOSE=${ISTIO_EXPOSE})"
@@ -136,13 +195,36 @@ kubectl get ns "$OBS_NS" >/dev/null 2>&1 || kubectl create ns "$OBS_NS"
 helm upgrade --install signoz signoz/signoz -n "$OBS_NS" \
   --set frontend.service.type=ClusterIP || true
 
+### 4.5) Fluent Bit 설치 (로그 수집)
+echo "[4.5] Fluent Bit 설치"
+helm repo add fluent https://fluent.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo update >/dev/null
+if [[ -f "${REPO_ROOT}/addons/values/fluent-bit/fluent-bit-values.yaml" ]]; then
+  helm upgrade --install fluent-bit fluent/fluent-bit -n "$OBS_NS" \
+    -f "${REPO_ROOT}/addons/values/fluent-bit/fluent-bit-values.yaml"
+else
+  echo "[WARN] fluent-bit-values.yaml 파일을 찾을 수 없어 기본 설정으로 설치합니다."
+  helm upgrade --install fluent-bit fluent/fluent-bit -n "$OBS_NS"
+fi
+
+### 4.6) Kube-State-Metrics 설치 (메트릭 수집)
+echo "[4.6] Kube-State-Metrics 설치"
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo update >/dev/null
+if [[ -f "${REPO_ROOT}/addons/values/kube-state-metrics/metrics-values.yaml" ]]; then
+  helm upgrade --install kube-state-metrics prometheus-community/kube-state-metrics -n "$OBS_NS" \
+    -f "${REPO_ROOT}/addons/values/kube-state-metrics/metrics-values.yaml"
+else
+  echo "[WARN] metrics-values.yaml 파일을 찾을 수 없어 기본 설정으로 설치합니다."
+  helm upgrade --install kube-state-metrics prometheus-community/kube-state-metrics -n "$OBS_NS"
+fi
+
 ### 5) Trivy Operator 설치/업그레이드 (Helm; 기존 values 사용)
-TRIVY_INSECURE="${TRIVY_INSECURE:-true}"           # 미정 환경변수 방어용 기본값
-TRIVY_USE_VALUES_CREDS="${TRIVY_USE_VALUES_CREDS:-0}" # 참고용(현재는 기존 values만 사용)
+# TODO: Harbor Insecure Registry 지원을 위한 환경 변수 (미구현)
+# TRIVY_INSECURE="${TRIVY_INSECURE:-true}"
+# TRIVY_USE_VALUES_CREDS="${TRIVY_USE_VALUES_CREDS:-0}"
 
 echo "[5] Trivy Operator 설치/업그레이드"
-SCRIPT_DIR="$(cd -- "$(dirname "$0")" && pwd -P)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 TRIVY_VALUES_FILE="${REPO_ROOT}/values/trivy/trivy-values.yaml"
 
 helm repo add aqua https://aquasecurity.github.io/helm-charts >/dev/null 2>&1 || true
