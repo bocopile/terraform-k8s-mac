@@ -3,9 +3,13 @@ auth:
 deployment:
   service_type: LoadBalancer
 external_services:
+  # Prometheus: SigNoz는 Prometheus 호환 API를 제공하지 않으므로 비활성화
+  # Kiali는 Istio 자체 메트릭(istio-proxy)을 사용하여 Service Mesh 시각화
   prometheus:
-    url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+    url: ""
+  # Tracing: SigNoz에서 트레이싱 제공, Kiali에서는 비활성화
+  # SigNoz UI(signoz.bocopile.io)에서 트레이싱 확인 가능
   tracing:
-    url: http://jaeger-query.tracing.svc.cluster.local:16686
+    enabled: false
 service:
   type: LoadBalancer

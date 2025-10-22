@@ -9,7 +9,16 @@ output "cluster_name" {
 
 output "cluster_version" {
   description = "Kubernetes version"
-  value       = "1.28.x (kubeadm default)"
+  value       = "1.34.x (kubeadm default)"
+}
+
+output "control_plane_endpoint" {
+  description = "Kubernetes Control Plane endpoint (Master node IP:6443)"
+  value = {
+    note    = "Control Plane endpoint is <master-ip>:6443. Run 'multipass list | grep k8s-master-0' to get master IP"
+    command = "multipass list | grep k8s-master-0 | awk '{print $3 \":6443\"}'"
+    port    = 6443
+  }
 }
 
 # ============================================================
@@ -24,6 +33,22 @@ output "master_nodes" {
 output "worker_nodes" {
   description = "List of worker node names"
   value       = module.k8s_cluster.worker_nodes
+}
+
+output "master_node_ips" {
+  description = "IP addresses of master nodes (use 'terraform output -json master_node_ips' after deployment or 'multipass list')"
+  value = {
+    note    = "Run 'multipass list' to get IP addresses after deployment"
+    command = "multipass list | grep k8s-master"
+  }
+}
+
+output "worker_node_ips" {
+  description = "IP addresses of worker nodes (use 'terraform output -json worker_node_ips' after deployment or 'multipass list')"
+  value = {
+    note    = "Run 'multipass list' to get IP addresses after deployment"
+    command = "multipass list | grep k8s-worker"
+  }
 }
 
 output "master_count" {
@@ -51,10 +76,26 @@ output "mysql_info" {
   sensitive   = false
 }
 
+output "mysql_vm_ip" {
+  description = "MySQL VM IP address (use 'multipass list | grep mysql' to get IP after deployment)"
+  value = {
+    note    = "Run 'multipass list | grep mysql' to get IP address after deployment"
+    command = "multipass list | grep mysql | awk '{print $3}'"
+  }
+}
+
 output "redis_info" {
   description = "Redis database information"
   value       = module.database.redis_info
   sensitive   = false
+}
+
+output "redis_vm_ip" {
+  description = "Redis VM IP address (use 'multipass list | grep redis' to get IP after deployment)"
+  value = {
+    note    = "Run 'multipass list | grep redis' to get IP address after deployment"
+    command = "multipass list | grep redis | awk '{print $3}'"
+  }
 }
 
 output "mysql_vm_name" {
@@ -146,6 +187,15 @@ output "ssh_master_command" {
 output "ssh_worker_command" {
   description = "SSH command to access the first worker node"
   value       = "multipass shell k8s-worker-0"
+}
+
+output "kubeconfig_path" {
+  description = "Kubeconfig file path on master node"
+  value = {
+    remote_path  = "/etc/kubernetes/admin.conf"
+    local_path   = "~/.kube/config"
+    copy_command = "multipass exec k8s-master-0 -- sudo cat /etc/kubernetes/admin.conf > ~/.kube/config"
+  }
 }
 
 output "kubectl_config_command" {
