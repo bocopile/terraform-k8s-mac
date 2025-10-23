@@ -1,5 +1,5 @@
 # Fluent Bit 로그 수집 설정
-# 목적: 모든 Pod 로그를 수집하여 SigNoz로 전송
+# 목적: 모든 Pod 로그를 수집하여 SigNoz OTEL Collector로 전송
 
 # 리소스 제한
 resources:
@@ -19,55 +19,117 @@ serviceAccount:
   create: true
   name: fluent-bit
 
-# 입력 소스: Container 로그
-inputs:
-  tail:
-    enabled: true
-    path: /var/log/containers/*.log
-    parser: docker
-    tag: kube.*
-    memBufLimit: 50MB
-    skipLongLines: true
-    refreshInterval: 5
-    db: /var/fluent-bit/state/flb_kube.db
-    dbSync: normal
-    multiline:
-      enabled: true
+# Fluent Bit 설정 (ConfigMap)
+config:
+  service: |
+    [SERVICE]
+        Daemon Off
+        Flush 5
+        Log_Level info
+        Parsers_File parsers.conf
+        Parsers_File custom_parsers.conf
+        HTTP_Server On
+        HTTP_Listen 0.0.0.0
+        HTTP_Port 2020
+        Health_Check On
 
-# 출력: SigNoz OTEL Collector
-outputs:
-  otlp:
-    enabled: true
-    host: signoz-otel-collector.signoz.svc.cluster.local
-    port: 4318
-    protocol: http
-    tls:
-      enabled: false
-    # Retry 설정
-    retry:
-      limit: 3
-    # Attribute 매핑
-    logAttributes:
-      k8s.cluster.name: local-multipass
-      environment: production
+  inputs: |
+    [INPUT]
+        Name tail
+        Path /var/log/containers/*.log
+        multiline.parser docker, cri, java, python, go
+        Tag kube.*
+        Mem_Buf_Limit 50MB
+        Skip_Long_Lines On
+        Refresh_Interval 5
+        DB /var/fluent-bit/state/flb_kube.db
+        DB.sync normal
 
-# 필터: Kubernetes 메타데이터 추가
-filters:
-  kubernetes:
-    enabled: true
-    kubeURL: https://kubernetes.default.svc:443
-    kubeCAFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-    kubeTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    mergeLog: true
-    keepLog: true
-    labels: true
-    annotations: true
-    k8sLoggingParser: true
-    k8sLoggingExclude: true
-    bufferSize: 32k
-    # Namespace/Pod 메타데이터 추가
-    useKubelet: true
-    kubeletPort: 10250
+  filters: |
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Kube_URL https://kubernetes.default.svc:443
+        Kube_CA_File /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix kube.var.log.containers.
+        Merge_Log On
+        Keep_Log On
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude On
+        Labels On
+        Annotations On
+        Buffer_Size 32k
+
+    [FILTER]
+        Name modify
+        Match kube.*
+        Add k8s.cluster.name local-multipass
+        Add deployment.environment production
+
+    [FILTER]
+        Name nest
+        Match kube.*
+        Operation lift
+        Nested_under kubernetes
+        Add_prefix k8s.
+
+    [FILTER]
+        Name grep
+        Match kube.*
+        Exclude k8s.namespace_name kube-system
+        Exclude k8s.namespace_name kube-public
+        Exclude k8s.namespace_name kube-node-lease
+
+  outputs: |
+    [OUTPUT]
+        Name http
+        Match kube.*
+        Host signoz-otel-collector.observability.svc.cluster.local
+        Port 4318
+        URI /v1/logs
+        Format json
+        Json_date_key timestamp
+        Json_date_format iso8601
+        Retry_Limit 3
+        tls Off
+        tls.verify Off
+
+  customParsers: |
+    [PARSER]
+        Name docker
+        Format json
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep On
+
+    [MULTILINE_PARSER]
+        Name java
+        Type regex
+        Flush_timeout 1000
+        # Java stack traces
+        Rule "start_state" "/^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2},\s+\d{4})/" "cont"
+        Rule "cont" "/^[\s]+(at|\.{3}\s)/" "cont"
+        Rule "cont" "/^Caused by:/" "cont"
+
+    [MULTILINE_PARSER]
+        Name python
+        Type regex
+        Flush_timeout 1000
+        # Python stack traces
+        Rule "start_state" "/^Traceback \(most recent call last\):$/" "cont"
+        Rule "cont" "/^\s+File.*/" "cont"
+        Rule "cont" "/^\s+.*/" "cont"
+        Rule "cont" "/^[A-Z][a-zA-Z]+Error:.*/" "cont"
+
+    [MULTILINE_PARSER]
+        Name go
+        Type regex
+        Flush_timeout 1000
+        # Go panic stack traces
+        Rule "start_state" "/^panic:/" "cont"
+        Rule "cont" "/^goroutine \d+/" "cont"
+        Rule "cont" "/^\s+.*\.go:\d+/" "cont"
 
 # 로그 레벨
 logLevel: info
