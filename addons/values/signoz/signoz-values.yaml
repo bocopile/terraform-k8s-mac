@@ -45,12 +45,15 @@ otelCollector:
       ports:
         otlpGrpc: 4317
         otlpHttp: 4318
+        zipkin: 9411
     config:
       receivers:
         otlp:
           protocols:
             grpc: {}
             http: {}
+        zipkin:
+          endpoint: 0.0.0.0:9411
         prometheus:
           config:
             scrape_configs:
@@ -135,7 +138,7 @@ otelCollector:
       service:
         pipelines:
           traces:
-            receivers: [otlp]
+            receivers: [otlp, zipkin]
             processors: [batch, resource]
             exporters: [clickhouse]
           metrics:
