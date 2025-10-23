@@ -51,5 +51,18 @@ secrets.env
 # .claude/** - REMOVED: We want to commit workflow documentation
 # Terraform sensitive files
 terraform.tfvars
+terraform.tfvars.test
 *.tfstate*
 .terraform/
+tfplan
+terraform_*.log
+
+# Generated files
+hosts.generated
+
+# JIRA scripts (may contain API keys)
+create_jira_issues*.sh
+create_all_jira_issues.sh
+
+# Addon logs
+addons_install.log

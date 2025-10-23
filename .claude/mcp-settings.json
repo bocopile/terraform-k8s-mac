@@ -10,6 +10,19 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
     },
+    "jira": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-jira"
+      ],
+      "env": {
+        "JIRA_BASE_URL": "${JIRA_BASE_URL}",
+        "JIRA_EMAIL": "${JIRA_EMAIL}",
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}",
+        "JIRA_PROJECT_KEY": "${JIRA_PROJECT_KEY}"
+      }
+    },
     "slack": {
       "command": "npx",
       "args": [

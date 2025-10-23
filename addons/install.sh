@@ -105,15 +105,15 @@ fi
 ### 0.5) Local Path Provisioner 설치 (PVC 지원)
 echo "[0.5] Local Path Provisioner 설치"
 kubectl get ns "$LOCALPATH_NS" >/dev/null 2>&1 || kubectl create ns "$LOCALPATH_NS"
-helm repo add local-path-provisioner https://charts.rancher.io >/dev/null 2>&1 || true
+helm repo add containeroo https://charts.containeroo.ch >/dev/null 2>&1 || true
 helm repo update >/dev/null
 if [[ -f "${REPO_ROOT}/addons/values/rancher/local-path.yaml" ]]; then
-  helm upgrade --install my-local-path-provisioner local-path-provisioner/local-path-provisioner \
+  helm upgrade --install my-local-path-provisioner containeroo/local-path-provisioner \
     -n "$LOCALPATH_NS" \
     -f "${REPO_ROOT}/addons/values/rancher/local-path.yaml"
 else
   echo "[WARN] local-path.yaml 파일을 찾을 수 없어 기본 설정으로 설치합니다."
-  helm upgrade --install my-local-path-provisioner local-path-provisioner/local-path-provisioner \
+  helm upgrade --install my-local-path-provisioner containeroo/local-path-provisioner \
     -n "$LOCALPATH_NS"
 fi
 
@@ -225,7 +225,7 @@ fi
 # TRIVY_USE_VALUES_CREDS="${TRIVY_USE_VALUES_CREDS:-0}"
 
 echo "[5] Trivy Operator 설치/업그레이드"
-TRIVY_VALUES_FILE="${REPO_ROOT}/values/trivy/trivy-values.yaml"
+TRIVY_VALUES_FILE="${REPO_ROOT}/addons/values/trivy/trivy-values.yaml"
 
 helm repo add aqua https://aquasecurity.github.io/helm-charts >/dev/null 2>&1 || true
 helm repo update >/dev/null
@@ -252,8 +252,8 @@ fi
 if [[ "$ISTIO_EXPOSE" == "on" ]]; then
   echo "[7] on 모드: Gateway/VirtualService 생성"
 
-  # 셀렉터(기본: istio=ingressgateway)
-  SEL_KEY="istio"; SEL_VAL="ingressgateway"
+  # 셀렉터(기본: istio=ingress)
+  SEL_KEY="istio"; SEL_VAL="ingress"
 
   apply_vs(){
     local ns="$1" host="$2" destHost="$3" port="$4" name="$5"
