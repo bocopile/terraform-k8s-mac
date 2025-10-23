@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-otel-demo
+  namespace: otel-demo
+  labels:
+    app: nodejs-otel-demo
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nodejs-otel-demo
+  template:
+    metadata:
+      labels:
+        app: nodejs-otel-demo
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: nodejs-otel-demo
+        image: nodejs-otel-demo:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "signoz-otel-collector.observability.svc.cluster.local:4317"
+        - name: SERVICE_NAME
+          value: "nodejs-otel-demo"
+        - name: DEPLOYMENT_ENVIRONMENT
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-otel-demo
+  namespace: otel-demo
+  labels:
+    app: nodejs-otel-demo
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: nodejs-otel-demo
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: nodejs-otel-demo-vs
+  namespace: otel-demo
+spec:
+  hosts:
+  - "nodejs-demo.bocopile.io"
+  gateways:
+  - nodejs-otel-demo-gw
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: nodejs-otel-demo
+        port:
+          number: 80
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: nodejs-otel-demo-gw
+  namespace: otel-demo
+spec:
+  selector:
+    istio: ingress
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "nodejs-demo.bocopile.io"

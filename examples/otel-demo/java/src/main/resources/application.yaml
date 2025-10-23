@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: java-otel-demo
+
+# OpenTelemetry 설정
+otel:
+  service:
+    name: ${OTEL_SERVICE_NAME:java-otel-demo}
+  deployment:
+    environment: ${OTEL_DEPLOYMENT_ENVIRONMENT:development}
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://signoz-otel-collector.observability.svc.cluster.local:4317}
+
+# Actuator 설정 (Health checks)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# 로깅 설정
+logging:
+  level:
+    io.bocopile.oteldemo: INFO
+    org.springframework: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
