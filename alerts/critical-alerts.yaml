@@ -1,0 +1,87 @@
+# Critical Alert Rules for SigNoz
+# These alerts require immediate attention
+
+alerts:
+  - name: pod-restarts
+    description: Pod has restarted more than 3 times in 15 minutes
+    query: increase(kube_pod_container_status_restarts_total[15m])
+    condition: "> 3"
+    duration: 1m
+    severity: critical
+    labels:
+      team: platform
+      component: kubernetes
+    annotations:
+      summary: "Pod {{pod}} in namespace {{namespace}} restarted {{value}} times"
+      description: "Pod restarts indicate potential application issues or resource constraints"
+      runbook: "https://wiki.example.com/runbooks/pod-restarts"
+
+  - name: service-down
+    description: Service endpoint is not responding
+    query: up{job="kube-state-metrics"}
+    condition: "== 0"
+    duration: 1m
+    severity: critical
+    labels:
+      team: platform
+      component: monitoring
+    annotations:
+      summary: "Service {{job}} is down"
+      description: "Critical service is unreachable"
+      runbook: "https://wiki.example.com/runbooks/service-down"
+
+  - name: high-error-rate
+    description: Error rate exceeds 5%
+    query: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100
+    condition: "> 5"
+    duration: 5m
+    severity: critical
+    labels:
+      team: application
+      component: api
+    annotations:
+      summary: "Service {{service}} error rate is {{value}}%"
+      description: "High error rate may indicate service degradation"
+      runbook: "https://wiki.example.com/runbooks/high-error-rate"
+
+  - name: pod-crash-loop
+    description: Pod is in CrashLoopBackOff state
+    query: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
+    condition: "== 1"
+    duration: 5m
+    severity: critical
+    labels:
+      team: application
+      component: deployment
+    annotations:
+      summary: "Pod {{pod}} in namespace {{namespace}} is in CrashLoopBackOff"
+      description: "Pod keeps crashing and restarting"
+      runbook: "https://wiki.example.com/runbooks/crash-loop"
+
+  - name: disk-full
+    description: Disk usage exceeds 90%
+    query: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100
+    condition: "> 90"
+    duration: 5m
+    severity: critical
+    labels:
+      team: platform
+      component: infrastructure
+    annotations:
+      summary: "Node {{node}} disk usage is {{value}}%"
+      description: "Disk space is critically low"
+      runbook: "https://wiki.example.com/runbooks/disk-full"
+
+  - name: out-of-memory
+    description: Memory usage exceeds 95%
+    query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100
+    condition: "> 95"
+    duration: 2m
+    severity: critical
+    labels:
+      team: platform
+      component: infrastructure
+    annotations:
+      summary: "Node {{node}} memory usage is {{value}}%"
+      description: "System is critically low on memory, OOM killer may trigger"
+      runbook: "https://wiki.example.com/runbooks/out-of-memory"

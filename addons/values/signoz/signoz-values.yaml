@@ -45,14 +45,91 @@ otelCollector:
       ports:
         otlpGrpc: 4317
         otlpHttp: 4318
+        zipkin: 9411
     config:
       receivers:
         otlp:
           protocols:
             grpc: {}
             http: {}
+        zipkin:
+          endpoint: 0.0.0.0:9411
+        prometheus:
+          config:
+            scrape_configs:
+              # Kube-State-Metrics 스크래핑
+              - job_name: 'kube-state-metrics'
+                scrape_interval: 30s
+                scrape_timeout: 10s
+                static_configs:
+                  - targets: ['kube-state-metrics.observability.svc.cluster.local:8080']
+                metric_relabel_configs:
+                  # 불필요한 메트릭 제외
+                  - source_labels: [__name__]
+                    regex: 'kube_pod_container_status_.*_total'
+                    action: drop
+                  # 클러스터 이름 추가
+                  - target_label: cluster
+                    replacement: 'local-multipass'
+
+              # Node Exporter 메트릭 (agent가 수집)
+              - job_name: 'node-exporter'
+                scrape_interval: 30s
+                scrape_timeout: 10s
+                kubernetes_sd_configs:
+                  - role: endpoints
+                    namespaces:
+                      names:
+                        - observability
+                relabel_configs:
+                  - source_labels: [__meta_kubernetes_service_name]
+                    regex: 'node-exporter'
+                    action: keep
+                  - source_labels: [__meta_kubernetes_endpoint_port_name]
+                    regex: 'metrics'
+                    action: keep
+                  - source_labels: [__meta_kubernetes_pod_node_name]
+                    target_label: node
+                metric_relabel_configs:
+                  # 클러스터 이름 추가
+                  - target_label: cluster
+                    replacement: 'local-multipass'
+
+              # Kubelet cAdvisor 메트릭
+              - job_name: 'kubelet-cadvisor'
+                scrape_interval: 30s
+                scrape_timeout: 10s
+                scheme: https
+                tls_config:
+                  ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                kubernetes_sd_configs:
+                  - role: node
+                relabel_configs:
+                  - action: labelmap
+                    regex: __meta_kubernetes_node_label_(.+)
+                  - target_label: __address__
+                    replacement: kubernetes.default.svc:443
+                  - source_labels: [__meta_kubernetes_node_name]
+                    regex: (.+)
+                    target_label: __metrics_path__
+                    replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+                metric_relabel_configs:
+                  # 클러스터 이름 추가
+                  - target_label: cluster
+                    replacement: 'local-multipass'
+                  # 컨테이너 메트릭만 유지
+                  - source_labels: [__name__]
+                    regex: 'container_(cpu|memory|network|fs)_.*'
+                    action: keep
+
       processors:
         batch: {}
+        resource:
+          attributes:
+            - key: cluster
+              value: local-multipass
+              action: upsert
       exporters:
         clickhouse:
           endpoint: tcp://signoz-clickhouse:9000?dial_timeout=10s&compress=true
@@ -61,16 +138,16 @@ otelCollector:
       service:
         pipelines:
           traces:
-            receivers: [otlp]
-            processors: [batch]
+            receivers: [otlp, zipkin]
+            processors: [batch, resource]
             exporters: [clickhouse]
           metrics:
-            receivers: [otlp]
-            processors: [batch]
+            receivers: [otlp, prometheus]
+            processors: [batch, resource]
             exporters: [clickhouse]
           logs:
             receivers: [otlp]
-            processors: [batch]
+            processors: [batch, resource]
             exporters: [clickhouse]
 
   agent:

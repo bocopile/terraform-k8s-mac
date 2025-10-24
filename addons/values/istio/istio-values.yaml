@@ -12,6 +12,26 @@ global:
     fsGroup: 1337
     seccompProfile:
       type: RuntimeDefault
+  # Distributed Tracing: SigNoz OTEL Collector 연동
+  tracer:
+    zipkin:
+      address: signoz-otel-collector.observability.svc.cluster.local:9411
+  # Envoy 트레이싱 설정
+  proxy_init:
+    image: proxyv2
+  meshConfig:
+    enableTracing: true
+    defaultConfig:
+      tracing:
+        sampling: 100.0  # 100% 샘플링 (개발/테스트용, 운영환경에서는 1-10% 권장)
+        max_path_tag_length: 256
+        zipkin:
+          address: signoz-otel-collector.observability.svc.cluster.local:9411
+    extensionProviders:
+      - name: signoz
+        zipkin:
+          service: signoz-otel-collector.observability.svc.cluster.local
+          port: 9411
 
 gateways:
   istio-ingressgateway:

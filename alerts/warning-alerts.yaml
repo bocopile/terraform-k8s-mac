@@ -1,0 +1,107 @@
+# Warning Alert Rules for SigNoz
+# These alerts require monitoring and may escalate
+
+alerts:
+  - name: high-cpu-usage
+    description: CPU usage exceeds 80%
+    query: (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (node)) * 100
+    condition: "> 80"
+    duration: 10m
+    severity: warning
+    labels:
+      team: platform
+      component: infrastructure
+    annotations:
+      summary: "Node {{node}} CPU usage is {{value}}%"
+      description: "High CPU usage may lead to performance degradation"
+
+  - name: high-memory-usage
+    description: Memory usage exceeds 85%
+    query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100
+    condition: "> 85"
+    duration: 10m
+    severity: warning
+    labels:
+      team: platform
+      component: infrastructure
+    annotations:
+      summary: "Node {{node}} memory usage is {{value}}%"
+      description: "High memory usage, consider adding more resources"
+
+  - name: slow-response-time
+    description: P95 latency exceeds 1 second
+    query: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+    condition: "> 1"
+    duration: 10m
+    severity: warning
+    labels:
+      team: application
+      component: performance
+    annotations:
+      summary: "Service {{service}} P95 latency is {{value}}s"
+      description: "Response time is degraded, investigate performance issues"
+
+  - name: pod-pending
+    description: Pod has been pending for more than 5 minutes
+    query: kube_pod_status_phase{phase="Pending"}
+    condition: "== 1"
+    duration: 5m
+    severity: warning
+    labels:
+      team: platform
+      component: kubernetes
+    annotations:
+      summary: "Pod {{pod}} in namespace {{namespace}} is pending"
+      description: "Pod cannot be scheduled, check node resources"
+
+  - name: deployment-replicas-mismatch
+    description: Deployment has fewer replicas than desired
+    query: kube_deployment_status_replicas_available / kube_deployment_spec_replicas
+    condition: "< 1"
+    duration: 5m
+    severity: warning
+    labels:
+      team: application
+      component: deployment
+    annotations:
+      summary: "Deployment {{deployment}} in namespace {{namespace}} has {{value}} available replicas"
+      description: "Not all replicas are available"
+
+  - name: high-log-error-rate
+    description: Error logs increasing rapidly
+    query: rate(log_entries{level="error"}[5m])
+    condition: "> 10"
+    duration: 5m
+    severity: warning
+    labels:
+      team: application
+      component: logs
+    annotations:
+      summary: "High error log rate in {{namespace}}/{{pod}}: {{value}} errors/s"
+      description: "Application is generating many error logs"
+
+  - name: certificate-expiring-soon
+    description: TLS certificate will expire within 7 days
+    query: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400
+    condition: "< 7"
+    duration: 1h
+    severity: warning
+    labels:
+      team: platform
+      component: security
+    annotations:
+      summary: "Certificate {{certificate}} expires in {{value}} days"
+      description: "Renew certificate before expiration"
+
+  - name: persistent-volume-filling-up
+    description: PVC usage exceeds 80%
+    query: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100
+    condition: "> 80"
+    duration: 10m
+    severity: warning
+    labels:
+      team: platform
+      component: storage
+    annotations:
+      summary: "PVC {{persistentvolumeclaim}} in namespace {{namespace}} is {{value}}% full"
+      description: "Persistent volume is filling up, consider expanding"

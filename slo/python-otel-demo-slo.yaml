@@ -1,0 +1,155 @@
+# SLO Definition for python-otel-demo service
+service:
+  name: python-otel-demo
+  namespace: otel-demo
+  owner: application-team
+  description: Python Flask OpenTelemetry demo application
+
+slos:
+  - name: availability
+    description: Service availability SLO
+    sli:
+      type: availability
+      query: |
+        sum(rate(http_requests_total{service="python-otel-demo",status!~"5.."}[30d]))
+        /
+        sum(rate(http_requests_total{service="python-otel-demo"}[30d]))
+        * 100
+    target:
+      value: 99.9
+      unit: percent
+      period: 30d
+    error_budget:
+      value: 0.1
+      unit: percent
+      # 30일 기준: 43.2분 (0.1% of 30 days)
+      downtime_allowed: 43.2m
+    alerts:
+      - type: burn_rate
+        severity: critical
+        burn_rate: 14.4  # 1시간에 error budget의 5% 소진
+        window: 1h
+      - type: burn_rate
+        severity: warning
+        burn_rate: 6     # 6시간에 error budget의 5% 소진
+        window: 6h
+
+  - name: latency
+    description: Request latency SLO (P95)
+    sli:
+      type: latency
+      query: |
+        histogram_quantile(0.95,
+          rate(http_request_duration_seconds_bucket{service="python-otel-demo"}[5m])
+        )
+    target:
+      value: 500
+      unit: milliseconds
+      compliance: 95  # 95% of requests should meet target
+    threshold:
+      warning: 400ms
+      critical: 1000ms
+    alerts:
+      - type: threshold
+        severity: warning
+        condition: "> 400ms"
+        duration: 10m
+      - type: threshold
+        severity: critical
+        condition: "> 1000ms"
+        duration: 5m
+
+  - name: error_rate
+    description: Error rate SLO
+    sli:
+      type: error_rate
+      query: |
+        sum(rate(http_requests_total{service="python-otel-demo",status=~"5.."}[5m]))
+        /
+        sum(rate(http_requests_total{service="python-otel-demo"}[5m]))
+        * 100
+    target:
+      value: 0.1
+      unit: percent
+      period: 30d
+    error_budget:
+      value: 0.1
+      unit: percent
+    alerts:
+      - type: threshold
+        severity: critical
+        condition: "> 1.0"  # 10x error budget
+        duration: 5m
+      - type: threshold
+        severity: warning
+        condition: "> 0.5"  # 5x error budget
+        duration: 10m
+
+  - name: throughput
+    description: Minimum throughput SLO
+    sli:
+      type: throughput
+      query: |
+        sum(rate(http_requests_total{service="python-otel-demo"}[5m]))
+    target:
+      value: 100
+      unit: requests_per_second
+      comparison: ">="
+    alerts:
+      - type: threshold
+        severity: warning
+        condition: "< 50"  # 50% of target
+        duration: 10m
+
+error_budget_policy:
+  # Error budget이 50% 이하로 떨어지면 조치
+  - remaining: 50%
+    actions:
+      - "Freeze feature releases"
+      - "Focus on reliability improvements"
+      - "Review and fix top error sources"
+
+  # Error budget이 25% 이하로 떨어지면 긴급 조치
+  - remaining: 25%
+    actions:
+      - "Stop all non-critical deployments"
+      - "Initiate incident response"
+      - "All hands on deck for reliability"
+
+  # Error budget이 10% 이하로 떨어지면 최우선 조치
+  - remaining: 10%
+    actions:
+      - "Declare service emergency"
+      - "Engage executive team"
+      - "Consider service rollback"
+
+dashboards:
+  - name: "Python OTEL Demo SLO Dashboard"
+    panels:
+      - title: "Availability SLO"
+        type: gauge
+        query: "availability.sli.query"
+        target: 99.9
+      - title: "Error Budget Remaining"
+        type: progress
+        query: "100 - (current_errors / error_budget * 100)"
+      - title: "P95 Latency"
+        type: timeseries
+        query: "latency.sli.query"
+        threshold: 500ms
+      - title: "Error Rate"
+        type: timeseries
+        query: "error_rate.sli.query"
+        threshold: 0.1%
+
+notifications:
+  channels:
+    - type: slack
+      name: "#sre-alerts"
+      severity: [critical, warning]
+    - type: email
+      name: "sre-team@example.com"
+      severity: [critical]
+    - type: pagerduty
+      name: "SRE On-Call"
+      severity: [critical]
