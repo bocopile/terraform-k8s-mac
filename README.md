@@ -9,8 +9,8 @@
 - helm : [helm 설치 링크](https://helm.sh/ko/docs/intro/install/)
 
 ## 구성 요소
-| 구성 요소 | 수량 | 설명 |
-|-----------|------|------|
+| 구성요소 | 수량 | 설명 |
+|----------|------|------|
 | Control Plane (Master) | 3대 | 고가용성 멀티 마스터 |
 | Worker Node | 6대 | 서비스 워크로드 처리 |
 | Redis VM | 1대 | Kubernetes 외부 Redis (패스워드 설정 포함) |
