@@ -1,0 +1,70 @@
+# Istio Ingress Gateway Configuration
+# MetalLB LoadBalancer로 외부 노출
+
+# Service 설정
+service:
+  type: LoadBalancer
+  ports:
+    - name: status-port
+      port: 15021
+      targetPort: 15021
+      protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+  annotations: {}
+    # metallb.universe.tf/address-pool: default
+    # metallb.universe.tf/load-balancer-ip: "192.168.65.201"
+
+# High Availability: Ingress Gateway 복제본
+replicaCount: 2
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  minAvailable: 1
+
+# Resource Limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 2000m
+    memory: 1024Mi
+
+# Autoscaling (선택)
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+# Pod Anti-Affinity: 다른 노드에 분산 배치
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: istio-ingress
+          topologyKey: kubernetes.io/hostname
+
+# Security Context
+securityContext:
+  runAsUser: 1337
+  runAsGroup: 1337
+  runAsNonRoot: true
+  fsGroup: 1337
+  seccompProfile:
+    type: RuntimeDefault
+
+# Labels
+labels:
+  app: istio-ingress
+  istio: ingress

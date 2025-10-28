@@ -149,15 +149,27 @@ fi
 ### 2) Ingress (on이면 LB, off면 ClusterIP로 유지)
 echo "[2] Istio Ingress 설정 (ISTIO_EXPOSE=${ISTIO_EXPOSE})"
 kubectl get ns "$INGRESS_NS" >/dev/null 2>&1 || kubectl create ns "$INGRESS_NS"
-# Helm으로 gateway 배포
+# Helm으로 gateway 배포 (values 파일 사용)
 if [[ "$ISTIO_EXPOSE" == "on" ]]; then
-  if [[ -n "$INGRESS_IP" ]]; then
-    helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
-      --set service.type=LoadBalancer \
-      --set service.annotations."metallb\.universe\.tf/load-balancer-ip"="$INGRESS_IP"
+  if [[ -f "${REPO_ROOT}/addons/values/istio/gateway-values.yaml" ]]; then
+    if [[ -n "$INGRESS_IP" ]]; then
+      helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
+        -f "${REPO_ROOT}/addons/values/istio/gateway-values.yaml" \
+        --set service.annotations."metallb\.universe\.tf/load-balancer-ip"="$INGRESS_IP"
+    else
+      helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
+        -f "${REPO_ROOT}/addons/values/istio/gateway-values.yaml"
+    fi
   else
-    helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
-      --set service.type=LoadBalancer
+    echo "[WARN] gateway-values.yaml 파일을 찾을 수 없어 기본 설정으로 설치합니다."
+    if [[ -n "$INGRESS_IP" ]]; then
+      helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
+        --set service.type=LoadBalancer \
+        --set service.annotations."metallb\.universe\.tf/load-balancer-ip"="$INGRESS_IP"
+    else
+      helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
+        --set service.type=LoadBalancer
+    fi
   fi
 else
   helm upgrade --install istio-ingress istio/gateway -n "$INGRESS_NS" \
