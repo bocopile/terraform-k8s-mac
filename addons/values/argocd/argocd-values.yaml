@@ -60,6 +60,9 @@ server:
     enabled: false
   service:
     type: ClusterIP  # ISTIO_EXPOSE=on 모드에서 Istio Ingress Gateway를 통해 노출
+  # Istio Gateway를 통해 HTTP로 노출하기 위한 insecure 모드 설정
+  extraArgs:
+    - --insecure
 
 # High Availability: Repo Server 고가용성 설정
 repoServer:
