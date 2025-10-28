@@ -115,7 +115,7 @@ Terraform `variables.tf` 에 정의된 기본값 기준으로 세팅
 
 ### Vault
 - **URL**: http://vault.bocopile.io
-- **상태**: 초기화 필요 (최초 1회)
+- **상태**: 초기화 필요 (최초 1회, install.sh 실행 시 자동으로 초기화됨)
 - **초기화 방법**:
   ```bash
   cd addons
@@ -133,6 +133,14 @@ Terraform `variables.tf` 에 정의된 기본값 기준으로 세팅
   # Unseal Keys 확인
   kubectl get secret vault-init -n vault -o jsonpath='{.data.unseal-keys}' | base64 -d
   ```
+
+- **웹 UI 로그인 방법**:
+  1. http://vault.bocopile.io 접속
+  2. Sign in method: **Token** 선택
+  3. Token 입력 (위 명령어로 확인한 Root Token)
+  4. Sign In 클릭
+
+  > 💡 **Tip**: 토큰 복사 시 앞뒤 공백이 없는지 확인하세요. 예: `hvs.XXXXXXXXXXXXXXXXXXXX`
 
 > ⚠️ **보안 권장사항**:
 > - ArgoCD: 최초 로그인 후 반드시 비밀번호를 변경하세요
