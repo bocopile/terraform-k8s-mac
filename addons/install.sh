@@ -352,6 +352,21 @@ else
   echo "[INFO] /etc/hosts에 병합하려면: sudo APPLY_HOSTS=1 bash $0 ${KUBECONFIG_PATH}"
 fi
 
+echo ""
+echo "=========================================="
+echo "Vault 초기화 시작"
+echo "=========================================="
+
+# Vault 초기화 스크립트 실행
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/init-vault.sh" ]; then
+  bash "$SCRIPT_DIR/init-vault.sh" "$KUBECONFIG_PATH"
+else
+  echo "[WARN] init-vault.sh를 찾을 수 없습니다. Vault를 수동으로 초기화하세요."
+  echo "       실행 방법: cd addons && ./init-vault.sh ~/kubeconfig"
+fi
+
+echo ""
 echo "[DONE] 설치 완료 (ISTIO_EXPOSE=${ISTIO_EXPOSE})"
 echo " - http://signoz.bocopile.io"
 echo " - http://argocd.bocopile.io"
