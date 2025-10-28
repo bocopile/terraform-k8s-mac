@@ -39,16 +39,47 @@
 
 ## 설치 방법
 
-### 1. 초기화 및 배포
+### 1. Kubernetes 클러스터 구축
 ```bash
+# Terraform 초기화 및 계획 확인
 terraform init && terraform plan
+
+# 인프라 배포 (Control Plane 3대 + Worker 6대 + Redis + MySQL)
 terraform apply -auto-approve
 ```
 
-### 2. 전체 삭제
+### 2. Add-ons 설치 (선택사항)
 ```bash
+cd addons
+
+# /etc/hosts 자동 병합 포함 설치
+sudo APPLY_HOSTS=1 bash install.sh ~/kubeconfig
+
+# 또는 off 모드로 설치 (각 서비스 개별 LoadBalancer 노출)
+# sudo ISTIO_EXPOSE=off APPLY_HOSTS=1 bash install.sh ~/kubeconfig
+
+# 설치 확인
+./verify.sh
+
+cd ..
+```
+
+### 3. 전체 삭제
+```bash
+# 1. Add-ons 삭제 (설치한 경우)
+cd addons
+./uninstall.sh ~/kubeconfig
+cd ..
+
+# 2. Terraform 리소스 삭제
 terraform destroy -auto-approve
+
+# 3. 로컬 파일 정리
 rm -rf .terraform .terraform.lock.hcl terraform.tfstate* ~/kubeconfig
+
+# 4. /etc/hosts 정리 (필요시)
+# bocopile.io 도메인 엔트리 제거
+sudo sed -i.bak '/bocopile\.io/d' /etc/hosts
 ```
 
 ## 🔐 Redis/MySQL 접속 정보
@@ -67,27 +98,67 @@ Terraform `variables.tf` 에 정의된 기본값 기준으로 세팅
 - Password: `finalyzerpass`
 - Database: `finalyzer`
 
+## 🔑 Add-ons 초기 계정 정보
+
+### ArgoCD
+- **URL**: http://argocd.bocopile.io
+- **Username**: `admin`
+- **Password**: `admin`
+- **비밀번호 변경 방법**:
+  ```bash
+  # ArgoCD CLI로 비밀번호 변경
+  argocd login argocd.bocopile.io --username admin --password admin
+  argocd account update-password
+
+  # 또는 UI에서 User Info > Update Password
+  ```
+
+### Vault
+- **URL**: http://vault.bocopile.io
+- **상태**: 초기화 필요 (최초 1회)
+- **초기화 방법**:
+  ```bash
+  cd addons
+  ./init-vault.sh ~/kubeconfig
+  ```
+- **초기화 후 생성되는 정보**:
+  - Root Token (관리자 토큰)
+  - Unseal Keys 5개 (3개로 unseal 가능)
+
+  초기화 정보는 `vault-init` Secret에 저장됩니다:
+  ```bash
+  # Root Token 확인
+  kubectl get secret vault-init -n vault -o jsonpath='{.data.root-token}' | base64 -d
+
+  # Unseal Keys 확인
+  kubectl get secret vault-init -n vault -o jsonpath='{.data.unseal-keys}' | base64 -d
+  ```
+
+> ⚠️ **보안 권장사항**:
+> - ArgoCD: 최초 로그인 후 반드시 비밀번호를 변경하세요
+> - Vault: Root Token과 Unseal Keys를 안전한 곳에 백업 후 Secret을 삭제하세요
+> - 프로덕션 환경에서는 RBAC 기반 인증으로 전환하세요
+
 ---
 
-# 🔧 Add-ons 설치 가이드 (`addon`)
+# 🔧 Add-ons 설치 가이드 (`addons`)
 
 이 프로젝트는 로컬 Mac 환경의 Kubernetes 클러스터에 다양한 Add-on(Observability, GitOps, Security 등)을 설치하고 설정하기 위한 자동화된 스크립트를 제공합니다. 모든 Add-on은 Helm Chart와 `values/` 디렉토리에 정의된 설정 파일 기반으로 설치됩니다.
 
 ## 📁 디렉토리 구조
 
 ```
-addon/
+addons/
 ├── install.sh               # 전체 Add-on을 순차 설치하는 스크립트
 ├── uninstall.sh             # 전체 Add-on을 제거하는 스크립트
 ├── verify.sh                # Add-on 설치 여부 및 접근성 확인 스크립트
-├── hosts.generated          # xxx.bocopile.io 도메인용 hosts 매핑 파일
+├── hosts.generated          # xxx.bocopile.io 도메인용 hosts 매핑 파일 (설치 시 자동 생성)
 └── values/                  # Helm values.yaml 모음
     ├── argocd/
     ├── istio/
-    ├── logging/
+    ├── fluent-bit/
     ├── metallb/
-    ├── monitoring/
-    ├── tracing/
+    ├── signoz/
     └── vault/
 ```
 
@@ -95,14 +166,15 @@ addon/
 
 ### 1. 사전 조건
 - Kubernetes 클러스터가 로컬에서 실행 중이어야 함 (multipass + kubeadm 기반)
+- Terraform으로 인프라를 먼저 구축해야 함 (위의 "설치 방법" 섹션 참고)
 - `xxx.bocopile.io` 도메인에 대한 hosts 매핑 필요 (`/etc/hosts`)
 
 ### 2. Add-on 일괄 설치
 
 ```bash
-cd addon
-# on 모드 + /etc/hosts 자동 병합
+cd addons
 
+# on 모드 + /etc/hosts 자동 병합
 sudo APPLY_HOSTS=1 bash install.sh ~/kubeconfig
 
 # off 모드 + /etc/hosts 자동 병합
@@ -167,7 +239,7 @@ Istio Gateway와 Vault를 활용하여 TLS 및 인증서 자동 관리 구조로
 
 ## 📎 Helm values 커스터마이징
 
-각 Add-on은 `values/<addon>` 디렉토리에 별도의 values.yaml이 존재하며, 도메인명, 인증 여부, 리소스 설정 등을 자유롭게 수정할 수 있습니다.
+각 Add-on은 `addons/values/<addon-name>/` 디렉토리에 별도의 values.yaml이 존재하며, 도메인명, 인증 여부, 리소스 설정 등을 자유롭게 수정할 수 있습니다.
 
 ---
 
