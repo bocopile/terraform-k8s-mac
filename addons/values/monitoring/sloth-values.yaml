@@ -1,0 +1,167 @@
+# Sloth Helm Values
+# SLO (Service Level Objective) Generator
+# Automatically generates Prometheus Recording and Alerting Rules from SLO definitions
+
+# Image configuration
+image:
+  repository: ghcr.io/slok/sloth
+  tag: v0.11.0
+  pullPolicy: IfNotPresent
+
+# Replicas
+replicaCount: 1
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Service account
+serviceAccount:
+  create: true
+  name: sloth
+  annotations: {}
+
+# RBAC
+rbac:
+  create: true
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  seccompProfile:
+    type: RuntimeDefault
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+
+# ServiceMonitor for Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: kube-prometheus-stack
+
+# Prometheus Operator integration
+prometheusOperator:
+  enabled: true
+  # Watch for PrometheusServiceLevel CRDs and generate PrometheusRules
+  labels:
+    release: kube-prometheus-stack
+
+# CRD installation
+customResourceDefinitions:
+  enabled: true
+
+# Controller configuration
+controller:
+  # Log level (debug, info, warn, error)
+  logLevel: info
+  # Metrics port
+  metricsPort: 8080
+  # Health probe port
+  healthPort: 8081
+
+# Sloth generation configuration
+generation:
+  # Default SLO period (28 days = 4 weeks)
+  defaultSLOPeriod: 28d
+  # Default error budget burn rate windows
+  defaultErrorBudgetBurnRate:
+    - long: 1h
+      short: 5m
+      factor: 14.4
+    - long: 6h
+      short: 30m
+      factor: 6
+    - long: 3d
+      short: 6h
+      factor: 1
+
+# Prometheus rule generation
+prometheusRules:
+  # Labels to add to all generated PrometheusRules
+  labels:
+    prometheus: kube-prometheus-stack
+    role: alert-rules
+  # Annotations to add to all generated PrometheusRules
+  annotations:
+    sloth.slok.dev/version: v0.11.0
+
+# Grafana dashboard configuration
+grafana:
+  enabled: false  # Set to true to auto-generate Grafana dashboards
+  # Dashboard sidecar configuration
+  sidecar:
+    enabled: false
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Priority class
+priorityClassName: ""
+
+# Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 1
+
+# Liveness probe
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8081
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+# Readiness probe
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8081
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3

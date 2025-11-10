@@ -1,0 +1,293 @@
+# Sloth SLO (Service Level Objective) Examples
+# PrometheusServiceLevel CRD examples for various use cases
+
+---
+# Example 1: API Availability SLO (99.9%)
+# Measures successful API requests (non-5xx responses)
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: api-availability
+  namespace: monitoring
+spec:
+  service: "api-service"
+  labels:
+    owner: platform-team
+    tier: critical
+  slos:
+    - name: "requests-availability"
+      objective: 99.9  # 99.9% availability
+      description: "API requests should succeed 99.9% of the time"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_requests_total{job="api-service",code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_requests_total{job="api-service"}[{{.window}}]))
+      alerting:
+        name: APIHighErrorRate
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on API service"
+        pageAlert:
+          labels:
+            severity: page
+        ticketAlert:
+          labels:
+            severity: ticket
+
+---
+# Example 2: API Latency SLO (p95 < 200ms)
+# Measures 95th percentile response time
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: api-latency
+  namespace: monitoring
+spec:
+  service: "api-service"
+  labels:
+    owner: platform-team
+    tier: critical
+  slos:
+    - name: "requests-latency"
+      objective: 95  # 95% of requests < 200ms
+      description: "95% of API requests should complete within 200ms"
+      sli:
+        events:
+          errorQuery: |
+            (
+              sum(rate(http_request_duration_seconds_bucket{job="api-service",le="0.2"}[{{.window}}]))
+              /
+              sum(rate(http_request_duration_seconds_count{job="api-service"}[{{.window}}]))
+            ) < bool 0.95
+          totalQuery: sum(rate(http_request_duration_seconds_count{job="api-service"}[{{.window}}]))
+      alerting:
+        name: APIHighLatency
+        labels:
+          severity: warning
+
+---
+# Example 3: Database Availability SLO (99.95%)
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: database-availability
+  namespace: monitoring
+spec:
+  service: "postgres"
+  labels:
+    owner: data-team
+    tier: critical
+  slos:
+    - name: "database-uptime"
+      objective: 99.95
+      description: "Database should be available 99.95% of the time"
+      sli:
+        events:
+          errorQuery: |
+            sum(up{job="postgres"} == 0)
+          totalQuery: |
+            count(up{job="postgres"})
+      alerting:
+        name: DatabaseDown
+        labels:
+          severity: critical
+        pageAlert:
+          labels:
+            severity: page
+
+---
+# Example 4: Message Queue Processing SLO
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: kafka-processing
+  namespace: monitoring
+spec:
+  service: "kafka-consumer"
+  labels:
+    owner: data-team
+    tier: high
+  slos:
+    - name: "message-processing-success"
+      objective: 99.5
+      description: "99.5% of messages should be processed successfully"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(kafka_consumer_failed_total{job="kafka-consumer"}[{{.window}}]))
+          totalQuery: |
+            sum(rate(kafka_consumer_processed_total{job="kafka-consumer"}[{{.window}}]))
+      alerting:
+        name: KafkaProcessingErrors
+        labels:
+          severity: warning
+
+---
+# Example 5: Multi-Window SLO (Different objectives for different time windows)
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: web-frontend-availability
+  namespace: monitoring
+spec:
+  service: "web-frontend"
+  labels:
+    owner: frontend-team
+    tier: high
+  slos:
+    # Short-term: 99% (1 day)
+    - name: "frontend-availability-1d"
+      objective: 99.0
+      description: "Frontend availability over 1 day"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_requests_total{job="web-frontend",code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_requests_total{job="web-frontend"}[{{.window}}]))
+      alerting:
+        name: FrontendHighErrorRate1d
+        labels:
+          severity: warning
+          window: 1d
+
+    # Long-term: 99.9% (28 days)
+    - name: "frontend-availability-28d"
+      objective: 99.9
+      description: "Frontend availability over 28 days"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_requests_total{job="web-frontend",code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_requests_total{job="web-frontend"}[{{.window}}]))
+      alerting:
+        name: FrontendHighErrorRate28d
+        labels:
+          severity: critical
+          window: 28d
+
+---
+# Example 6: gRPC Service SLO
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: grpc-service-availability
+  namespace: monitoring
+spec:
+  service: "grpc-backend"
+  labels:
+    owner: backend-team
+    tier: critical
+  slos:
+    - name: "grpc-requests-availability"
+      objective: 99.9
+      description: "gRPC requests should succeed 99.9% of the time"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(grpc_server_handled_total{job="grpc-backend",grpc_code!="OK"}[{{.window}}]))
+          totalQuery: |
+            sum(rate(grpc_server_handled_total{job="grpc-backend"}[{{.window}}]))
+      alerting:
+        name: GRPCHighErrorRate
+        labels:
+          severity: critical
+
+---
+# Example 7: Storage Write SLO
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: storage-write-availability
+  namespace: monitoring
+spec:
+  service: "object-storage"
+  labels:
+    owner: storage-team
+    tier: critical
+  slos:
+    - name: "storage-write-success"
+      objective: 99.99
+      description: "Storage writes should succeed 99.99% of the time"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(storage_write_errors_total{job="minio"}[{{.window}}]))
+          totalQuery: |
+            sum(rate(storage_write_operations_total{job="minio"}[{{.window}}]))
+      alerting:
+        name: StorageWriteErrors
+        labels:
+          severity: critical
+        pageAlert:
+          labels:
+            severity: page
+
+---
+# Example 8: Backup Success SLO
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: backup-success
+  namespace: monitoring
+spec:
+  service: "backup-job"
+  labels:
+    owner: infra-team
+    tier: high
+  slos:
+    - name: "backup-success-rate"
+      objective: 99.0
+      description: "Backup jobs should succeed 99% of the time"
+      sli:
+        events:
+          errorQuery: |
+            sum(backup_job_status{status="failed"})
+          totalQuery: |
+            sum(backup_job_status)
+      alerting:
+        name: BackupJobFailures
+        labels:
+          severity: warning
+
+---
+# Example 9: Multi-Burn-Rate SLO (Advanced)
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: api-advanced-slo
+  namespace: monitoring
+spec:
+  service: "critical-api"
+  labels:
+    owner: platform-team
+    tier: critical
+  slos:
+    - name: "api-availability-advanced"
+      objective: 99.95
+      description: "Critical API with multi-burn-rate alerting"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_requests_total{job="critical-api",code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_requests_total{job="critical-api"}[{{.window}}]))
+      alerting:
+        name: CriticalAPIErrorBudgetBurn
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical API is burning error budget too fast"
+          description: "{{ $labels.service }} error budget is being consumed at {{ $value }}x the normal rate"
+        pageAlert:
+          labels:
+            severity: page
+          annotations:
+            runbook: "https://wiki.company.com/runbooks/critical-api"
+        ticketAlert:
+          labels:
+            severity: ticket
