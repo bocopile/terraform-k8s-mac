@@ -1,0 +1,56 @@
+# ===================================
+# Claude Code SubAgent Dependencies
+# ===================================
+
+# 환경변수 관리
+python-dotenv==1.0.0
+
+# JIRA 연동
+jira==3.5.2
+
+# Slack 연동
+slack-sdk==3.23.0
+
+# Git 연동
+gitpython==3.1.40
+
+# Redis (Message Queue)
+redis==5.0.1
+
+# HTTP 요청
+requests==2.31.0
+
+# 데이터 처리
+pydantic==2.5.3
+
+# 로깅
+colorlog==6.8.0
+
+# CLI
+click==8.1.7
+
+# 날짜/시간 처리
+python-dateutil==2.8.2
+
+# YAML 파싱
+PyYAML==6.0.1
+
+# JSON 스키마 검증
+jsonschema==4.20.0
+
+# 프로세스 관리 (tmux 제어)
+libtmux==0.25.0
+
+# 테스트 프레임워크 (개발용)
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# 코드 포맷팅 (개발용)
+black==23.12.1
+flake8==7.0.0
+isort==5.13.2
+
+# MCP (Model Context Protocol)
+# Note: MCP 서버는 주로 Node.js 기반이므로 npm으로 설치
+# Python에서는 HTTP/JSON-RPC로 통신하거나 subprocess로 실행
