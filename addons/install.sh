@@ -9,6 +9,7 @@ helm repo add kiali https://kiali.org/helm-charts
 helm repo add hashicorp https://helm.releases.hashicorp.com
 helm repo add metallb https://metallb.github.io/metallb
 helm repo add containeroo https://charts.containeroo.ch
+helm repo add fluent https://fluent.github.io/helm-charts
 helm repo update
 
 # MetalLB
@@ -31,7 +32,10 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
 
 # Logging
 helm upgrade --install loki grafana/loki-stack -n logging --create-namespace -f values/logging/loki-values.yaml
-helm upgrade --install promtail grafana/promtail -n logging --create-namespace -f values/logging/promtail-values.yaml
+# Fluent Bit replaces Promtail for better performance and OpenTelemetry integration
+helm upgrade --install fluent-bit fluent/fluent-bit -n logging --create-namespace -f values/logging/fluent-bit-values.yaml
+# Promtail (deprecated - migrated to Fluent Bit)
+# helm upgrade --install promtail grafana/promtail -n logging --create-namespace -f values/logging/promtail-values.yaml
 
 # Tracing
 helm upgrade --install jaeger jaegertracing/jaeger -n tracing --create-namespace -f values/tracing/jaeger-values.yaml
