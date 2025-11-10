@@ -75,11 +75,9 @@ env/
 ENV/
 
 # Claude Code SubAgent
-checkpoints/*.json
-checkpoints/*.json.bak
+checkpoints/
 !checkpoints/.gitkeep
-logs/*.log
-logs/*.out
+logs/
 !logs/.gitkeep
 *.pid
-.claude/settings.local.json.backup.*
+.claude/
