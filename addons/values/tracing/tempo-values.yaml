@@ -16,16 +16,18 @@ tempo:
   # Storage configuration
   storage:
     trace:
-      backend: local  # Use 'local' for filesystem, 's3' for MinIO
-      local:
-        path: /var/tempo/traces
-      # S3 configuration (for future MinIO integration)
-      # s3:
-      #   bucket: tempo-traces
-      #   endpoint: minio.minio.svc.cluster.local:9000
-      #   access_key: ${MINIO_ACCESS_KEY}
-      #   secret_key: ${MINIO_SECRET_KEY}
-      #   insecure: true
+      backend: s3  # Use 'local' for filesystem, 's3' for MinIO
+      # Local storage (fallback)
+      # local:
+      #   path: /var/tempo/traces
+      # S3 configuration (MinIO integration)
+      s3:
+        bucket: tempo-data
+        endpoint: minio.storage.svc.cluster.local:9000
+        access_key: minioadmin
+        secret_key: minioadmin123
+        insecure: true
+        forcepathstyle: true
 
   # Retention policy
   retention:

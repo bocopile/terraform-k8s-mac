@@ -6,8 +6,25 @@ commonConfig:
 compactor:
   working_directory: /data/loki/compactor
 
+# Storage backend configuration
+# Use 'filesystem' for local storage or 's3' for MinIO
 storage:
-  type: filesystem
+  type: s3
+  bucketNames:
+    chunks: loki-data
+    ruler: loki-data
+    admin: loki-data
+  s3:
+    endpoint: http://minio.storage.svc.cluster.local:9000
+    bucketnames: loki-data
+    access_key_id: minioadmin
+    secret_access_key: minioadmin123
+    insecure: true
+    s3ForcePathStyle: true
+
+# Fallback: Filesystem storage (for local development without MinIO)
+# storage:
+#   type: filesystem
 
 loki:
   persistence:
