@@ -1,0 +1,229 @@
+# KEDA ScaledObject Examples
+# These are example configurations for various scalers
+
+---
+# Example 1: Prometheus Scaler
+# Scale based on Prometheus metrics (e.g., HTTP request rate)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: prometheus-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: nginx-deployment  # Target deployment name
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 15  # Check metrics every 15 seconds
+  cooldownPeriod: 300  # Wait 5 minutes before scaling down
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        metricName: http_requests_total
+        query: sum(rate(http_requests_total{job="nginx"}[2m]))
+        threshold: "100"  # Scale when requests/sec > 100
+
+---
+# Example 2: CPU Scaler
+# Scale based on CPU utilization (similar to HPA)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cpu-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: app-deployment
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"  # Target 70% CPU utilization
+
+---
+# Example 3: Memory Scaler
+# Scale based on memory utilization
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: memory-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: app-deployment
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: "80"  # Target 80% memory utilization
+
+---
+# Example 4: Cron Scaler
+# Scale based on schedule (e.g., business hours)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cron-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: app-deployment
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: cron
+      metadata:
+        timezone: Asia/Seoul
+        start: 0 9 * * 1-5   # Mon-Fri 9:00 AM
+        end: 0 18 * * 1-5     # Mon-Fri 6:00 PM
+        desiredReplicas: "10"
+
+---
+# Example 5: HTTP Scaler (HTTP Add-on required)
+# Scale based on incoming HTTP requests
+apiVersion: keda.sh/v1alpha1
+kind: HTTPScaledObject
+metadata:
+  name: http-scaledobject
+  namespace: default
+spec:
+  hosts:
+    - myapp.example.com
+  pathPrefixes:
+    - /api
+  scaleTargetRef:
+    name: app-deployment
+    service: app-service
+    port: 8080
+  replicas:
+    min: 1
+    max: 100
+  targetPendingRequests: 100  # Scale when pending requests > 100
+
+---
+# Example 6: Kafka Scaler
+# Scale based on Kafka consumer lag
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: kafka-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: kafka-consumer-deployment
+  minReplicaCount: 1
+  maxReplicaCount: 30
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka-broker.kafka.svc.cluster.local:9092
+        consumerGroup: my-consumer-group
+        topic: my-topic
+        lagThreshold: "1000"  # Scale when lag > 1000 messages
+        offsetResetPolicy: latest
+
+---
+# Example 7: RabbitMQ Scaler
+# Scale based on RabbitMQ queue length
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: rabbitmq-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: rabbitmq-consumer-deployment
+  minReplicaCount: 1
+  maxReplicaCount: 30
+  triggers:
+    - type: rabbitmq
+      metadata:
+        host: amqp://guest:guest@rabbitmq.default.svc.cluster.local:5672
+        queueName: my-queue
+        queueLength: "100"  # Scale when queue length > 100
+
+---
+# Example 8: Redis Scaler
+# Scale based on Redis list length
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: redis-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: redis-worker-deployment
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    - type: redis
+      metadata:
+        address: redis.default.svc.cluster.local:6379
+        listName: my-work-queue
+        listLength: "50"  # Scale when list length > 50
+
+---
+# Example 9: External Scaler
+# Scale based on custom external metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: external-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: app-deployment
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: external
+      metadata:
+        scalerAddress: external-scaler.keda.svc.cluster.local:6000
+        metricName: custom_metric
+        targetValue: "100"
+
+---
+# Example 10: Multiple Triggers (Composite Scaling)
+# Scale based on multiple conditions
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: multi-trigger-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: app-deployment
+  minReplicaCount: 2
+  maxReplicaCount: 50
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
+  triggers:
+    # CPU trigger
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+    # Memory trigger
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: "80"
+    # Prometheus trigger
+    - type: prometheus
+      metadata:
+        serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        metricName: http_requests_total
+        query: sum(rate(http_requests_total[2m]))
+        threshold: "1000"
