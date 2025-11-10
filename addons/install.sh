@@ -38,7 +38,10 @@ helm upgrade --install fluent-bit fluent/fluent-bit -n logging --create-namespac
 # helm upgrade --install promtail grafana/promtail -n logging --create-namespace -f values/logging/promtail-values.yaml
 
 # Tracing
-helm upgrade --install jaeger jaegertracing/jaeger -n tracing --create-namespace -f values/tracing/jaeger-values.yaml
+# Grafana Tempo replaces Jaeger for better Grafana integration and S3 storage support
+helm upgrade --install tempo grafana/tempo -n tracing --create-namespace -f values/tracing/tempo-values.yaml
+# Jaeger (deprecated - migrated to Grafana Tempo)
+# helm upgrade --install jaeger jaegertracing/jaeger -n tracing --create-namespace -f values/tracing/jaeger-values.yaml
 helm upgrade --install otel open-telemetry/opentelemetry-collector -n tracing -f values/tracing/otel-values.yaml
 helm upgrade --install kiali kiali/kiali-server -n istio-system -f values/tracing/kiali-values.yaml
 

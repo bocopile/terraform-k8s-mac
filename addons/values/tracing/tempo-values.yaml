@@ -1,0 +1,243 @@
+# Grafana Tempo Helm Values
+# Replaces Jaeger for distributed tracing
+# Integrates with Grafana for Logs ↔ Traces correlation
+
+# Global configuration
+tempo:
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  # Storage configuration
+  storage:
+    trace:
+      backend: local  # Use 'local' for filesystem, 's3' for MinIO
+      local:
+        path: /var/tempo/traces
+      # S3 configuration (for future MinIO integration)
+      # s3:
+      #   bucket: tempo-traces
+      #   endpoint: minio.minio.svc.cluster.local:9000
+      #   access_key: ${MINIO_ACCESS_KEY}
+      #   secret_key: ${MINIO_SECRET_KEY}
+      #   insecure: true
+
+  # Retention policy
+  retention:
+    enabled: true
+    max_duration: 168h  # 7 days
+
+  # Compactor configuration (block merging and optimization)
+  compactor:
+    enabled: true
+    compaction:
+      block_retention: 720h  # 30 days
+      compacted_block_retention: 24h
+      max_compaction_objects: 1000000
+      max_block_bytes: 107374182400  # 100GB
+      max_time_per_tenant: 5m
+      retention_concurrency: 10
+
+  # Query frontend (caching and query optimization)
+  queryFrontend:
+    enabled: true
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  # Ingester configuration
+  ingester:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+  # Distributor configuration
+  distributor:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  # Receivers configuration
+  receivers:
+    # OTLP gRPC receiver (primary)
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+    # Jaeger receivers (for migration compatibility)
+    jaeger:
+      protocols:
+        thrift_http:
+          endpoint: 0.0.0.0:14268
+        grpc:
+          endpoint: 0.0.0.0:14250
+
+    # Zipkin receiver (for compatibility)
+    zipkin:
+      endpoint: 0.0.0.0:9411
+
+# Persistence
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClassName: local-path
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    # OTLP
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+    # Jaeger
+    - name: jaeger-thrift-http
+      port: 14268
+      targetPort: 14268
+      protocol: TCP
+    - name: jaeger-grpc
+      port: 14250
+      targetPort: 14250
+      protocol: TCP
+    # Zipkin
+    - name: zipkin
+      port: 9411
+      targetPort: 9411
+      protocol: TCP
+    # Tempo query
+    - name: tempo
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+
+# ServiceMonitor for Prometheus metrics
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: kube-prometheus-stack
+  additionalLabels: {}
+
+# Metrics generator (for trace-derived metrics)
+metricsGenerator:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  config:
+    storage:
+      path: /var/tempo/generator
+      wal:
+        dir: /var/tempo/generator/wal
+      remote_write:
+        - url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+          send_exemplars: true
+
+# Grafana datasource configuration
+grafana:
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Tempo
+          type: tempo
+          access: proxy
+          url: http://tempo.tracing.svc.cluster.local:3200
+          jsonData:
+            httpMethod: GET
+            tracesToLogs:
+              datasourceUid: 'loki'
+              tags: ['job', 'instance', 'pod', 'namespace']
+              mappedTags: [{ key: 'service.name', value: 'service' }]
+              mapTagNamesEnabled: false
+              spanStartTimeShift: '-1h'
+              spanEndTimeShift: '1h'
+              filterByTraceID: true
+              filterBySpanID: false
+            tracesToMetrics:
+              datasourceUid: 'prometheus'
+              tags: [{ key: 'service.name', value: 'service' }, { key: 'job' }]
+              queries:
+                - name: 'Sample query'
+                  query: 'sum(rate(traces_spanmetrics_latency_bucket{$__tags}[5m]))'
+            serviceMap:
+              datasourceUid: 'prometheus'
+            nodeGraph:
+              enabled: true
+            search:
+              hide: false
+            lokiSearch:
+              datasourceUid: 'loki'
+
+# Pod security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3200"
+  prometheus.io/path: "/metrics"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 1
