@@ -1,0 +1,200 @@
+# Velero Helm Values
+# Kubernetes Backup and Restore
+# Integrates with MinIO for S3-compatible storage
+
+# Image configuration
+image:
+  repository: velero/velero
+  tag: v1.14.1
+  pullPolicy: IfNotPresent
+
+# Init containers
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.10.1
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Resource limits
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Service account
+serviceAccount:
+  server:
+    create: true
+    name: velero
+
+# RBAC
+rbac:
+  create: true
+
+# Security context
+securityContext:
+  fsGroup: 65534
+  runAsUser: 65534
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - ALL
+
+# Configuration
+configuration:
+  # Backup storage location
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: velero-backups
+      default: true
+      config:
+        region: minio
+        s3ForcePathStyle: true
+        s3Url: http://minio.storage.svc.cluster.local:9000
+        publicUrl: http://minio.bocopile.io:9000
+
+  # Volume snapshot location (for CSI snapshots)
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: minio
+
+  # Provider name
+  provider: aws
+
+  # Backup defaults
+  backupSyncPeriod: 60m
+  defaultBackupStorageLocation: default
+  defaultBackupTTL: 168h  # 7 days
+  defaultVolumeSnapshotLocations: aws:default
+
+  # Restore defaults
+  restoreResourcePriorities: namespaces,storageclasses,persistentvolumeclaims,persistentvolumes,secrets,configmaps,serviceaccounts,limitranges,pods
+
+  # Features
+  features: EnableCSI
+
+  # Log level
+  logLevel: info
+  logFormat: json
+
+# Credentials for MinIO
+credentials:
+  useSecret: true
+  secretContents:
+    cloud: |
+      [default]
+      aws_access_key_id=minioadmin
+      aws_secret_access_key=minioadmin123
+
+# Node-Agent (Restic replacement) for file-level backup
+nodeAgent:
+  enabled: true
+  podVolumePath: /var/lib/kubelet/pods
+  privileged: false
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  tolerations: []
+
+# Schedules
+schedules:
+  # Daily backup of all namespaces
+  daily-backup:
+    disabled: false
+    schedule: "0 2 * * *"  # 2 AM daily
+    useOwnerReferencesInBackup: false
+    template:
+      ttl: 168h  # 7 days
+      includedNamespaces:
+        - "*"
+      excludedNamespaces:
+        - kube-system
+        - kube-public
+        - kube-node-lease
+      snapshotVolumes: true
+      defaultVolumesToFsBackup: true
+
+  # Weekly backup with longer retention
+  weekly-backup:
+    disabled: false
+    schedule: "0 3 * * 0"  # 3 AM every Sunday
+    useOwnerReferencesInBackup: false
+    template:
+      ttl: 720h  # 30 days
+      includedNamespaces:
+        - "*"
+      excludedNamespaces:
+        - kube-system
+        - kube-public
+        - kube-node-lease
+      snapshotVolumes: true
+      defaultVolumesToFsBackup: true
+
+# Metrics
+metrics:
+  enabled: true
+  scrapeInterval: 30s
+  scrapeTimeout: 10s
+  service:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8085"
+      prometheus.io/path: "/metrics"
+    labels:
+      release: kube-prometheus-stack
+
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack
+
+  prometheusRule:
+    enabled: false
+    additionalLabels: {}
+    spec: []
+
+# Cleanup CRDs on uninstall
+cleanUpCRDs: false
+
+# Kubectl image for restore jobs
+kubectl:
+  image:
+    repository: docker.io/bitnami/kubectl
+    tag: 1.30
+
+# Snapshot controller
+snapshotsEnabled: true
+deployNodeAgent: true
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8085"
+  prometheus.io/path: "/metrics"
+
+# Priority class
+priorityClassName: ""
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Update strategy
+upgradeCRDs: true
+```
