@@ -47,16 +47,16 @@ resources:
 service:
   type: LoadBalancer
   port: 9000
-  # Annotations for MetalLB
+  # Annotations for MetalLB (auto-assign from IP pool)
   annotations:
-    metallb.universe.tf/address-pool: default
+    metallb.universe.tf/address-pool: default-address-pool
 
 # Console service (web UI)
 consoleService:
   type: LoadBalancer
   port: 9001
   annotations:
-    metallb.universe.tf/address-pool: default
+    metallb.universe.tf/address-pool: default-address-pool
 
 # Security context
 securityContext:
