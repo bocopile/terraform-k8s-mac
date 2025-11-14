@@ -9,6 +9,13 @@ helm repo add kiali https://kiali.org/helm-charts
 helm repo add hashicorp https://helm.releases.hashicorp.com
 helm repo add metallb https://metallb.github.io/metallb
 helm repo add containeroo https://charts.containeroo.ch
+helm repo add fluent https://fluent.github.io/helm-charts
+helm repo add jetstack https://charts.jetstack.io
+helm repo add minio https://charts.min.io/
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm repo add sloth https://slok.github.io/sloth
+helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
 helm repo update
 
 # MetalLB
@@ -18,6 +25,20 @@ kubectl apply -f values/metallb/metallb-config.yaml
 
 # 로컬 동적 프로바이더
 helm upgrade --install my-local-path-provisioner containeroo/local-path-provisioner --version 0.0.22 -n local-path-storage --create-namespace --values values/rancher/local-path.yaml
+
+# cert-manager (TLS certificate management)
+helm upgrade --install cert-manager jetstack/cert-manager \
+  -n cert-manager \
+  --create-namespace \
+  -f values/networking/cert-manager-values.yaml
+
+# Wait for cert-manager webhook to be ready
+sleep 30
+kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager-webhook -n cert-manager
+
+# Create ClusterIssuers and CA Certificate
+kubectl apply -f values/networking/cluster-issuers.yaml
+
 # Istio
 helm upgrade --install istio-base istio/base -n istio-system --create-namespace -f values/istio/istio-values.yaml
 helm upgrade --install istiod istio/istiod -n istio-system -f values/istio/istio-values.yaml
@@ -31,15 +52,36 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
 
 # Logging
 helm upgrade --install loki grafana/loki-stack -n logging --create-namespace -f values/logging/loki-values.yaml
-helm upgrade --install promtail grafana/promtail -n logging --create-namespace -f values/logging/promtail-values.yaml
+# Fluent Bit replaces Promtail for better performance and OpenTelemetry integration
+helm upgrade --install fluent-bit fluent/fluent-bit -n logging --create-namespace -f values/logging/fluent-bit-values.yaml
+# Promtail (deprecated - migrated to Fluent Bit)
+# helm upgrade --install promtail grafana/promtail -n logging --create-namespace -f values/logging/promtail-values.yaml
 
 # Tracing
-helm upgrade --install jaeger jaegertracing/jaeger -n tracing --create-namespace -f values/tracing/jaeger-values.yaml
+# Grafana Tempo replaces Jaeger for better Grafana integration and S3 storage support
+helm upgrade --install tempo grafana/tempo -n tracing --create-namespace -f values/tracing/tempo-values.yaml
+# Jaeger (deprecated - migrated to Grafana Tempo)
+# helm upgrade --install jaeger jaegertracing/jaeger -n tracing --create-namespace -f values/tracing/jaeger-values.yaml
 helm upgrade --install otel open-telemetry/opentelemetry-collector -n tracing -f values/tracing/otel-values.yaml
 helm upgrade --install kiali kiali/kiali-server -n istio-system -f values/tracing/kiali-values.yaml
 
 # Vault
 helm upgrade --install vault hashicorp/vault -n vault --create-namespace -f values/vault/vault-values.yaml
+
+# MinIO (S3-compatible storage for Loki/Tempo) - TERRAFORM-60
+helm upgrade --install minio minio/minio -n minio --create-namespace -f values/storage/minio-values.yaml
+
+# KEDA (Event-driven autoscaling) - TERRAFORM-61
+helm upgrade --install keda kedacore/keda -n keda --create-namespace -f values/autoscaling/keda-values.yaml
+
+# Kyverno (Policy engine) - TERRAFORM-62
+helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace -f values/security/kyverno-values.yaml
+
+# Sloth (SLO automation) - TERRAFORM-63
+helm upgrade --install sloth sloth/sloth -n monitoring -f values/monitoring/sloth-values.yaml
+
+# Velero (Backup and restore) - TERRAFORM-64
+helm upgrade --install velero vmware-tanzu/velero -n velero --create-namespace -f values/backup/velero-values.yaml
 
 # --- LoadBalancer IP to /etc/hosts mapping ---
 echo "[INFO] Waiting for LoadBalancer IPs to be assigned..."

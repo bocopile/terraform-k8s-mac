@@ -1,0 +1,224 @@
+# Kyverno Helm Values
+# Kubernetes Policy Engine for validation, mutation, and generation
+
+# Replicas
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: ghcr.io/kyverno/kyverno
+  tag: v1.12.5
+  pullPolicy: IfNotPresent
+
+# Init container image
+initImage:
+  repository: ghcr.io/kyverno/kyvernopre
+  tag: v1.12.5
+  pullPolicy: IfNotPresent
+
+# Resource limits
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Service Account
+serviceAccount:
+  create: true
+  name: kyverno
+  annotations: {}
+
+# RBAC
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 443
+  nodePort: null
+
+# Create self-signed TLS certificate
+createSelfSignedCert: true
+
+# Admission controller settings
+admissionController:
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# Background controller settings
+backgroundController:
+  enabled: true
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# Cleanup controller settings
+cleanupController:
+  enabled: true
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# Reports controller settings
+reportsController:
+  enabled: true
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# Config settings
+config:
+  # Exclude namespaces from Kyverno processing
+  excludeKyvernoNamespace: true
+  excludeGroups:
+    - system:nodes
+  # Resource filters
+  resourceFilters:
+    - "[Event,*,*]"
+    - "[*,kube-system,*]"
+    - "[*,kube-public,*]"
+    - "[*,kube-node-lease,*]"
+    - "[Node,*,*]"
+    - "[APIService,*,*]"
+    - "[TokenReview,*,*]"
+    - "[SubjectAccessReview,*,*]"
+    - "[SelfSubjectAccessReview,*,*]"
+    - "[Binding,*,*]"
+    - "[ReplicaSet,*,*]"
+    - "[ReportChangeRequest,*,*]"
+    - "[ClusterReportChangeRequest,*,*]"
+  # Webhook configuration
+  webhooks:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kyverno
+
+# Metrics configuration
+metricsService:
+  create: true
+  type: ClusterIP
+  port: 8000
+  nodePort: null
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+
+# Logging
+logging:
+  level: info
+  format: json
+
+# Features
+features:
+  policyExceptions:
+    enabled: true
+    namespace: kyverno
+  validatingAdmissionPolicyReports:
+    enabled: false
+  admissionReports:
+    enabled: true
+  backgroundScan:
+    enabled: true
+    interval: 1h
+  configMapCaching:
+    enabled: true
+
+# Policy reports cleanup
+cleanupJobs:
+  admissionReports:
+    enabled: true
+    schedule: "*/10 * * * *"
+    threshold: 10000
+  clusterAdmissionReports:
+    enabled: true
+    schedule: "*/10 * * * *"
+    threshold: 10000
+
+# Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 1
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Priority class
+priorityClassName: ""
+
+# Extra arguments
+extraArgs:
+  - --loggingFormat=json
+  - --v=2
+  - --admissionReports=true
+  - --backgroundScan=true
+  - --autoUpdateWebhooks=true
+
+# Network policy
+networkPolicy:
+  enabled: false
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

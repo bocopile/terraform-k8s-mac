@@ -1,0 +1,133 @@
+# MinIO Helm Values
+# S3-compatible object storage for Loki and Tempo
+# Provides local development environment for S3 scenarios
+
+# Deployment mode
+mode: standalone  # Single instance mode
+
+# Number of MinIO instances (for standalone mode, should be 1)
+replicas: 1
+
+# Image configuration
+image:
+  repository: quay.io/minio/minio
+  tag: RELEASE.2024-12-18T13-15-44Z
+  pullPolicy: IfNotPresent
+
+# Root credentials (change in production)
+rootUser: minioadmin
+rootPassword: minioadmin123
+
+# Buckets to be created automatically
+buckets:
+  - name: loki-data
+    policy: none
+    purge: false
+  - name: tempo-data
+    policy: none
+    purge: false
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: local-path
+  accessMode: ReadWriteOnce
+  size: 50Gi
+
+# Resource limits
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+# Service configuration
+service:
+  type: LoadBalancer
+  port: 9000
+  # Annotations for MetalLB (auto-assign from IP pool)
+  annotations:
+    metallb.universe.tf/address-pool: default-address-pool
+
+# Console service (web UI)
+consoleService:
+  type: LoadBalancer
+  port: 9001
+  annotations:
+    metallb.universe.tf/address-pool: default-address-pool
+
+# Security context
+securityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+
+# Network policies
+networkPolicy:
+  enabled: false
+  allowExternal: true
+
+# Monitoring (Prometheus metrics)
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9000"
+  prometheus.io/path: "/minio/v2/metrics/cluster"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}
+
+# Update strategy (fixed: deploymentUpdate not DeploymentUpdate)
+deploymentUpdate:
+  type: RollingUpdate
+  maxUnavailable: 0
+  maxSurge: 100%
+
+# Liveness probe
+livenessProbe:
+  httpGet:
+    path: /minio/health/live
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+
+# Readiness probe
+readinessProbe:
+  httpGet:
+    path: /minio/health/ready
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+
+# Environment variables
+environment:
+  # Browser access (web console)
+  MINIO_BROWSER: "on"
+  # Prometheus metrics
+  MINIO_PROMETHEUS_AUTH_TYPE: "public"

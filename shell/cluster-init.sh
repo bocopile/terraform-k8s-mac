@@ -1,6 +1,52 @@
 
 #!/bin/bash
 
+set -e
+
+# Wait for cloud-init to complete
+echo "=========================================="
+echo "Waiting for cloud-init to complete..."
+echo "=========================================="
+cloud-init status --wait
+
+echo "Cloud-init completed. Checking cloud-init status..."
+cloud-init status --long
+
+# Wait for kubeadm to be available
+echo "=========================================="
+echo "Waiting for kubeadm installation..."
+echo "=========================================="
+MAX_RETRIES=60
+RETRY_COUNT=0
+while ! command -v kubeadm &> /dev/null; do
+  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "=========================================="
+    echo "ERROR: kubeadm not found after ${MAX_RETRIES} retries ($(($MAX_RETRIES * 10)) seconds)"
+    echo "Cloud-init status:"
+    cloud-init status --long
+    echo "=========================================="
+    echo "Checking if kubernetes packages are installed:"
+    dpkg -l | grep -i kube || echo "No kubernetes packages found"
+    echo "=========================================="
+    echo "Checking apt logs:"
+    tail -50 /var/log/cloud-init-output.log || echo "Cannot read cloud-init-output.log"
+    echo "=========================================="
+    exit 1
+  fi
+  echo "[$(date +%H:%M:%S)] kubeadm not found yet, waiting... ($RETRY_COUNT/$MAX_RETRIES)"
+  sleep 10
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+echo "=========================================="
+echo "kubeadm found! Versions:"
+echo "kubeadm: $(kubeadm version -o short)"
+echo "kubelet: $(kubelet --version)"
+echo "kubectl: $(kubectl version --client=true -o yaml | grep gitVersion)"
+echo "=========================================="
+echo "Starting cluster initialization..."
+echo "=========================================="
+
 if hostname | grep -q "k8s-master-0"; then
   MASTER_IP=$(hostname -I | awk '{print $1}')
 

@@ -1,0 +1,73 @@
+# Grafana Tempo Helm Values
+# Replaces Jaeger for distributed tracing
+# Integrates with Grafana for Logs ↔ Traces correlation
+
+# Number of replicas
+replicas: 1
+
+# Tempo configuration
+tempo:
+  repository: grafana/tempo
+  tag: ""
+  pullPolicy: IfNotPresent
+
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  # Retention period (simple string format)
+  retention: 168h  # 7 days
+
+  # Metrics generator configuration
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+
+  # Ingester configuration
+  ingester: {}
+
+  # Querier configuration
+  querier: {}
+
+  # Query frontend configuration
+  queryFrontend: {}
+
+  # Server configuration
+  server:
+    http_listen_port: 3200
+
+# Persistence
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClassName: local-path
+
+# ServiceMonitor for Prometheus metrics
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: kube-prometheus-stack
+
+# Pod security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3200"
+  prometheus.io/path: "/metrics"
+
+# Update strategy
+updateStrategy: RollingUpdate

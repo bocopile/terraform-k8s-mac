@@ -21,10 +21,17 @@ config:
               - targets: ['localhost:8888']
 
   exporters:
+    # OTLP exporter for Grafana Tempo
     otlp:
-      endpoint: jaeger-collector.tracing.svc.cluster.local:14250
+      endpoint: tempo.tracing.svc.cluster.local:4317
       tls:
         insecure: true
+
+    # Legacy Jaeger exporter (deprecated)
+    # otlp/jaeger:
+    #   endpoint: jaeger-collector.tracing.svc.cluster.local:14250
+    #   tls:
+    #     insecure: true
 
     debug: {}  # logging → debug 대체
 

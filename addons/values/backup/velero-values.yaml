@@ -1,0 +1,95 @@
+# Velero Helm Values (Simplified)
+# Kubernetes Backup and Restore with MinIO backend
+
+# Init containers for AWS S3 plugin (MinIO compatibility)
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.10.1
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Resources
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Credentials for MinIO
+credentials:
+  useSecret: true
+  secretContents:
+    cloud: |
+      [default]
+      aws_access_key_id=minioadmin
+      aws_secret_access_key=minioadmin123
+
+# Configuration
+configuration:
+  # Backup storage location (MinIO S3)
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: velero-backups
+      default: true
+      config:
+        region: minio
+        s3ForcePathStyle: "true"
+        s3Url: http://minio.minio.svc.cluster.local:9000
+        publicUrl: http://minio.bocopile.io:9000
+
+  # Volume snapshot location
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: minio
+
+  # Server settings
+  defaultBackupTTL: 168h  # 7 days
+
+# Node-Agent (file-level backup)
+nodeAgent:
+  enabled: true
+  podVolumePath: /var/lib/kubelet/pods
+  privileged: false
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Metrics for Prometheus
+metrics:
+  enabled: true
+  service:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8085"
+      prometheus.io/path: "/metrics"
+    labels:
+      release: kube-prometheus-stack
+
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# Schedules (commented out - enable after testing basic setup)
+# schedules:
+#   daily-backup:
+#     disabled: false
+#     schedule: "0 2 * * *"
+#     template:
+#       ttl: 168h
+#       includedNamespaces:
+#         - "*"
+#       excludedNamespaces:
+#         - kube-system
+#         - kube-public
+#         - kube-node-lease

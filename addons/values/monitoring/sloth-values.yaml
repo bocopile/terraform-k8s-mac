@@ -1,0 +1,89 @@
+# Sloth Helm Values
+# SLO (Service Level Objective) Generator
+# Automatically generates Prometheus Recording and Alerting Rules from SLO definitions
+
+# Image configuration
+image:
+  registry: ghcr.io
+  repository: slok/sloth
+  tag: v0.15.0
+  pullPolicy: IfNotPresent
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Sloth configuration
+sloth:
+  resyncInterval: ""
+  workers: 0
+  labelSelector: ""
+  namespace: ""
+  extraLabels: {}
+  defaultSloPeriod: "28d"
+  debug:
+    enabled: false
+  logger: default
+
+# Common SLI plugins via git-sync
+commonPlugins:
+  enabled: true
+  image:
+    repository: registry.k8s.io/git-sync/git-sync
+    tag: v4.5.0
+  gitRepo:
+    url: https://github.com/slok/sloth-common-sli-plugins
+    branch: main
+    resources:
+      limits:
+        cpu: 50m
+        memory: 100Mi
+      requests:
+        cpu: 5m
+        memory: 50Mi
+
+# Metrics configuration
+metrics:
+  enabled: true
+  prometheusLabels:
+    release: kube-prometheus-stack
+
+# Security context
+securityContext:
+  pod:
+    runAsNonRoot: true
+    runAsUser: 65534
+    fsGroup: 65534
+  container:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false  # Disabled for git-sync compatibility
+    seccompProfile:
+      type: RuntimeDefault
+
+# Extra volumes for git-sync temp files
+extraVolumes:
+  - name: tmp
+    emptyDir: {}
+extraVolumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Priority class
+priorityClassName: ""
