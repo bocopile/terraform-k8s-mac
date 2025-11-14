@@ -11,6 +11,11 @@ helm repo add metallb https://metallb.github.io/metallb
 helm repo add containeroo https://charts.containeroo.ch
 helm repo add fluent https://fluent.github.io/helm-charts
 helm repo add jetstack https://charts.jetstack.io
+helm repo add minio https://charts.min.io/
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm repo add sloth https://slok.github.io/sloth
+helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
 helm repo update
 
 # MetalLB
@@ -62,6 +67,21 @@ helm upgrade --install kiali kiali/kiali-server -n istio-system -f values/tracin
 
 # Vault
 helm upgrade --install vault hashicorp/vault -n vault --create-namespace -f values/vault/vault-values.yaml
+
+# MinIO (S3-compatible storage for Loki/Tempo) - TERRAFORM-60
+helm upgrade --install minio minio/minio -n minio --create-namespace -f values/storage/minio-values.yaml
+
+# KEDA (Event-driven autoscaling) - TERRAFORM-61
+helm upgrade --install keda kedacore/keda -n keda --create-namespace -f values/autoscaling/keda-values.yaml
+
+# Kyverno (Policy engine) - TERRAFORM-62
+helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace -f values/security/kyverno-values.yaml
+
+# Sloth (SLO automation) - TERRAFORM-63
+helm upgrade --install sloth sloth/sloth -n monitoring -f values/monitoring/sloth-values.yaml
+
+# Velero (Backup and restore) - TERRAFORM-64
+helm upgrade --install velero vmware-tanzu/velero -n velero --create-namespace -f values/backup/velero-values.yaml
 
 # --- LoadBalancer IP to /etc/hosts mapping ---
 echo "[INFO] Waiting for LoadBalancer IPs to be assigned..."

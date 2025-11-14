@@ -14,6 +14,8 @@ daemonSetVolumes:
     hostPath:
       path: /etc/machine-id
       type: File
+  - name: flb-storage
+    emptyDir: {}
 
 daemonSetVolumeMounts:
   - name: varlog
@@ -25,6 +27,8 @@ daemonSetVolumeMounts:
   - name: etcmachineid
     mountPath: /etc/machine-id
     readOnly: true
+  - name: flb-storage
+    mountPath: /var/fluent-bit/state
 
 # 리소스 최적화
 resources:

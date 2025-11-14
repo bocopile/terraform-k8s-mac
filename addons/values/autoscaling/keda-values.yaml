@@ -7,14 +7,17 @@ fullnameOverride: keda
 # Image configuration
 image:
   keda:
-    repository: ghcr.io/kedacore/keda
-    tag: 2.15.1
+    registry: ghcr.io
+    repository: kedacore/keda
+    tag: 2.18.1
   metricsApiServer:
-    repository: ghcr.io/kedacore/keda-metrics-apiserver
-    tag: 2.15.1
+    registry: ghcr.io
+    repository: kedacore/keda-metrics-apiserver
+    tag: 2.18.1
   webhooks:
-    repository: ghcr.io/kedacore/keda-admission-webhooks
-    tag: 2.15.1
+    registry: ghcr.io
+    repository: kedacore/keda-admission-webhooks
+    tag: 2.18.1
 
 # Replicas
 replicaCount: 1
@@ -93,36 +96,46 @@ prometheus:
         release: kube-prometheus-stack
 
 # Pod security context
-securityContext:
+podSecurityContext:
   operator:
     runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
-    capabilities:
-      drop:
-        - ALL
   metricServer:
     runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
-    capabilities:
-      drop:
-        - ALL
   webhooks:
     runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
+
+# Container security context
+securityContext:
+  operator:
     capabilities:
       drop:
         - ALL
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  metricServer:
+    capabilities:
+      drop:
+        - ALL
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  webhooks:
+    capabilities:
+      drop:
+        - ALL
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
 
 # Logging level (debug, info, warn, error)
 logging:
   operator:
     level: info
     format: json
-  metricServer:
-    level: info
   webhooks:
     level: info
 
@@ -183,17 +196,23 @@ env: []
 # Priority class
 priorityClassName: ""
 
-# Update strategy
-strategy:
-  type: RollingUpdate
-  rollingUpdate:
-    maxUnavailable: 1
-    maxSurge: 1
-
-# Upgrade CRDs automatically
+# Upgrade strategy for each component
 upgradeStrategy:
-  operator: immediate
-  metricsApiServer: immediate
+  operator:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  metricsApiServer:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  webhooks:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
 
 # Service configuration
 service:

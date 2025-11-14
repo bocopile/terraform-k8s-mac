@@ -131,13 +131,13 @@ config:
     - "[ClusterReportChangeRequest,*,*]"
   # Webhook configuration
   webhooks:
-    - namespaceSelector:
-        matchExpressions:
-          - key: kubernetes.io/metadata.name
-            operator: NotIn
-            values:
-              - kube-system
-              - kyverno
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kyverno
 
 # Metrics configuration
 metricsService:

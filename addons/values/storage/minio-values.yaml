@@ -5,13 +5,13 @@
 # Deployment mode
 mode: standalone  # Single instance mode
 
-# Number of MinIO instances
+# Number of MinIO instances (for standalone mode, should be 1)
 replicas: 1
 
 # Image configuration
 image:
   repository: quay.io/minio/minio
-  tag: RELEASE.2025-01-08T17-40-03Z
+  tag: RELEASE.2024-12-18T13-15-44Z
   pullPolicy: IfNotPresent
 
 # Root credentials (change in production)
@@ -47,18 +47,16 @@ resources:
 service:
   type: LoadBalancer
   port: 9000
-  # Console port for web UI
-  consolePort: 9001
   # Annotations for MetalLB
   annotations:
-    metallb.universe.tf/loadBalancerIPs: 192.168.100.240
+    metallb.universe.tf/address-pool: default
 
-# Console ingress (optional)
+# Console service (web UI)
 consoleService:
   type: LoadBalancer
   port: 9001
   annotations:
-    metallb.universe.tf/loadBalancerIPs: 192.168.100.241
+    metallb.universe.tf/address-pool: default
 
 # Security context
 securityContext:
@@ -73,34 +71,14 @@ networkPolicy:
   enabled: false
   allowExternal: true
 
-# Lifecycle policies (retention)
-# Automatically delete data older than 30 days
-policies:
-  - name: loki-retention
-    statements:
-      - resource: arn:aws:s3:::loki-data/*
-        effect: Allow
-        actions:
-          - s3:DeleteObject
-        conditions:
-          DateGreaterThan:
-            s3:ExistingObjectTag/retention: "30d"
-  - name: tempo-retention
-    statements:
-      - resource: arn:aws:s3:::tempo-data/*
-        effect: Allow
-        actions:
-          - s3:DeleteObject
-        conditions:
-          DateGreaterThan:
-            s3:ExistingObjectTag/retention: "30d"
-
-# Monitoring
+# Monitoring (Prometheus metrics)
 metrics:
   serviceMonitor:
     enabled: true
     interval: 30s
     scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
 
 # Pod annotations
 podAnnotations:
@@ -117,8 +95,8 @@ tolerations: []
 # Affinity rules
 affinity: {}
 
-# Update strategy
-DeploymentUpdate:
+# Update strategy (fixed: deploymentUpdate not DeploymentUpdate)
+deploymentUpdate:
   type: RollingUpdate
   maxUnavailable: 0
   maxSurge: 100%
@@ -153,9 +131,3 @@ environment:
   MINIO_BROWSER: "on"
   # Prometheus metrics
   MINIO_PROMETHEUS_AUTH_TYPE: "public"
-  # Server URL for console
-  MINIO_SERVER_URL: "http://minio.bocopile.io:9000"
-  MINIO_BROWSER_REDIRECT_URL: "http://minio.bocopile.io:9001"
-
-# Init containers (for bucket creation)
-# Users will be created via MC (MinIO Client) after installation
