@@ -11,6 +11,11 @@ tempo:
   tag: ""
   pullPolicy: IfNotPresent
 
+  service:
+    type: LoadBalancer
+    annotations:
+      metallb.universe.tf/address-pool: default-address-pool
+
   # Resource limits
   resources:
     limits:
@@ -35,7 +40,11 @@ tempo:
   querier: {}
 
   # Query frontend configuration
-  queryFrontend: {}
+  queryFrontend:
+    service:
+      type: LoadBalancer
+      annotations:
+        metallb.universe.tf/address-pool: default-address-pool
 
   # Server configuration
   server:
