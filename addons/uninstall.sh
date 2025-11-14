@@ -4,7 +4,7 @@ echo "🗑️  Helm Release 삭제 시작..."
 # 순서에 유의 (종속성 있는 리소스부터)
 helm uninstall kiali -n istio-system
 helm uninstall otel -n tracing
-helm uninstall jaeger -n tracing
+helm uninstall tempo -n tracing
 helm uninstall promtail -n logging
 helm uninstall loki -n logging
 helm uninstall kube-prometheus-stack -n monitoring
@@ -26,10 +26,12 @@ kubectl delete ns istio-system istio-ingress argocd monitoring logging tracing v
 DOMAINS=(
  "argocd.bocopile.io"
  "grafana.bocopile.io"
- "jaeger.bocopile.io"
+ "tempo.bocopile.io"
  "kiali.bocopile.io"
  "otel.bocopile.io"
  "vault.bocopile.io"
+ "minio.bocopile.io"
+ "minio-console.bocopile.io"
 )
 
 echo "Cleaning up /etc/hosts entries..."

@@ -4,6 +4,11 @@ image:
 
 mode: deployment
 
+service:
+  type: LoadBalancer
+  annotations:
+    metallb.universe.tf/address-pool: default-address-pool
+
 config:
   receivers:
     otlp:
