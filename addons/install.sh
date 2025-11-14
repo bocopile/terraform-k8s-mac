@@ -91,7 +91,7 @@ HOSTS_FILE="./hosts.generated"
 echo "" > "$HOSTS_FILE"
 
 # DOMAIN:SERVICE.NAMESPACE
-SERVICE_MAP="argocd.bocopile.io:argocd-server.argocd grafana.bocopile.io:kube-prometheus-stack-grafana.monitoring jaeger.bocopile.io:jaeger-query.tracing kiali.bocopile.io:kiali.istio-system vault.bocopile.io:vault.vault "
+SERVICE_MAP="argocd.bocopile.io:argocd-server.argocd grafana.bocopile.io:kube-prometheus-stack-grafana.monitoring tempo.bocopile.io:tempo-query-frontend.tracing kiali.bocopile.io:kiali.istio-system vault.bocopile.io:vault.vault minio.bocopile.io:minio-console.minio"
 
 for entry in $SERVICE_MAP; do
   domain=${entry%%:*}
