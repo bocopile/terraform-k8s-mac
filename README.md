@@ -153,3 +153,461 @@ Istio Gateway와 Vault를 활용하여 TLS 및 인증서 자동 관리 구조로
 ## 📎 Helm values 커스터마이징
 
 각 Add-on은 `values/<addon>` 디렉토리에 별도의 values.yaml이 존재하며, 도메인명, 인증 여부, 리소스 설정 등을 자유롭게 수정할 수 있습니다.
+
+---
+
+# 📚 Sprint 1, 2 작업 애드온 핵심 사용 가이드
+
+## 1️⃣ 모니터링 (Prometheus + Grafana)
+
+### 접속
+```bash
+# URL: http://grafana.bocopile.io
+# 계정: admin / admin
+```
+
+### 핵심 사용법
+```yaml
+# ServiceMonitor 생성 예시
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: my-app-metrics
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  endpoints:
+    - port: metrics
+      interval: 30s
+```
+
+### 주요 명령
+```bash
+# Prometheus 상태 확인
+kubectl get prometheus -n monitoring
+
+# Grafana 대시보드 목록
+kubectl get configmap -n monitoring | grep dashboard
+```
+
+---
+
+## 2️⃣ 로깅 (Loki + Fluent-Bit)
+
+### 접속
+Grafana Explore 메뉴 → Loki 데이터소스 선택
+
+### 핵심 쿼리 예시
+```logql
+# 특정 네임스페이스 로그 조회
+{namespace="default"}
+
+# 에러 로그만 필터링
+{namespace="default"} |= "error" or "ERROR"
+
+# 특정 Pod 로그 조회
+{pod="my-app-7d8f9c5b-xyz"}
+```
+
+### 주요 명령
+```bash
+# Fluent-Bit 상태 확인
+kubectl get daemonset -n logging fluent-bit
+
+# Loki 상태 확인
+kubectl get pods -n logging -l app=loki
+```
+
+---
+
+## 3️⃣ 트레이싱 (Tempo + OpenTelemetry + Kiali)
+
+### Tempo 접속
+Grafana Explore 메뉴 → Tempo 데이터소스 선택
+
+### Kiali 접속
+```bash
+# URL: http://kiali.bocopile.io
+```
+
+### 핵심 사용법
+```bash
+# OpenTelemetry Collector 상태 확인
+kubectl get pods -n tracing -l app.kubernetes.io/name=opentelemetry-collector
+
+# Tempo 추적 데이터 확인
+kubectl logs -n tracing -l app=tempo
+```
+
+### 애플리케이션 계측 예시
+```yaml
+# OpenTelemetry 자동 계측 활성화
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.opentelemetry.io/inject: "true"
+```
+
+---
+
+## 4️⃣ Service Mesh (Istio)
+
+### 핵심 사용법
+```bash
+# 네임스페이스에 Istio 주입 활성화
+kubectl label namespace default istio-injection=enabled
+
+# VirtualService 생성 예시
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: my-app
+spec:
+  hosts:
+    - my-app.example.com
+  http:
+    - route:
+        - destination:
+            host: my-app-service
+            port:
+              number: 8080
+EOF
+```
+
+### 주요 명령
+```bash
+# Istio 상태 확인
+istioctl version
+kubectl get pods -n istio-system
+
+# Istio 프록시 상태 확인
+istioctl proxy-status
+```
+
+---
+
+## 5️⃣ GitOps (ArgoCD)
+
+### 접속
+```bash
+# URL: https://argocd.bocopile.io
+# 초기 비밀번호 확인
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+### 핵심 사용법
+```bash
+# Application 생성
+cat <<EOF | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/myorg/myrepo.git
+    targetRevision: main
+    path: k8s/
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+```
+
+### 주요 명령
+```bash
+# ArgoCD CLI 로그인
+argocd login argocd.bocopile.io
+
+# Application 목록
+argocd app list
+
+# 수동 동기화
+argocd app sync my-app
+```
+
+---
+
+## 6️⃣ 보안 (Vault + Kyverno)
+
+### Vault 접속
+```bash
+# URL: http://vault.bocopile.io
+# 초기화 및 Unseal 필요
+kubectl exec -n vault vault-0 -- vault operator init
+```
+
+### Kyverno 핵심 사용법
+```bash
+# Policy 적용
+kubectl apply -f addons/values/security/kyverno-policies.yaml
+
+# Policy 위반 확인
+kubectl get policyreport -A
+
+# 특정 Policy 상태 확인
+kubectl describe clusterpolicy require-resource-limits
+```
+
+### Policy 예시
+```yaml
+# 리소스 제한 필수 정책
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-container-resources
+      match:
+        resources:
+          kinds:
+            - Pod
+      validate:
+        message: "CPU and memory limits are required."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+```
+
+---
+
+## 7️⃣ 스토리지 (MinIO)
+
+### 접속 정보
+```bash
+# MinIO Console 접속
+kubectl port-forward -n minio svc/minio 9001:9001
+# URL: http://localhost:9001
+
+# 계정 정보 확인
+kubectl get secret -n minio minio -o jsonpath='{.data.rootUser}' | base64 -d
+kubectl get secret -n minio minio -o jsonpath='{.data.rootPassword}' | base64 -d
+```
+
+### 핵심 사용법
+```bash
+# Bucket 생성 (Loki/Tempo용)
+mc alias set myminio http://minio.minio.svc.cluster.local:9000 admin password
+mc mb myminio/loki-data
+mc mb myminio/tempo-data
+```
+
+---
+
+## 8️⃣ 오토스케일링 (KEDA)
+
+### 핵심 사용법
+```bash
+# ScaledObject 적용 예시
+cat <<EOF | kubectl apply -f -
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cpu-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: my-deployment
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+EOF
+```
+
+### 주요 명령
+```bash
+# KEDA 상태 확인
+kubectl get scaledobjects -A
+
+# 스케일링 이벤트 확인
+kubectl describe scaledobject cpu-scaler
+
+# HPA 자동 생성 확인
+kubectl get hpa
+```
+
+### 더 많은 예시
+Prometheus, Kafka, Redis, Cron 등 다양한 스케일러 예시는 `addons/values/autoscaling/keda-scaledobject-example.yaml` 참고
+
+---
+
+## 9️⃣ 백업 (Velero)
+
+### 핵심 사용법
+```bash
+# 전체 네임스페이스 백업
+velero backup create my-backup --include-namespaces default
+
+# 특정 리소스만 백업
+velero backup create app-backup --selector app=my-app
+
+# 백업 목록 확인
+velero backup get
+
+# 복원
+velero restore create --from-backup my-backup
+
+# 스케줄 백업 설정
+velero schedule create daily-backup --schedule="0 2 * * *" --include-namespaces default
+```
+
+### 주요 명령
+```bash
+# Velero 상태 확인
+kubectl get pods -n velero
+
+# 백업 위치 확인
+velero backup-location get
+```
+
+---
+
+## 🔟 SLO 관리 (Sloth)
+
+### 핵심 사용법
+```bash
+# SLO 정의 적용
+kubectl apply -f addons/values/monitoring/sloth-slo-examples.yaml
+
+# SLO 확인
+kubectl get prometheusslo -A
+
+# 생성된 PrometheusRule 확인
+kubectl get prometheusrule -n monitoring | grep sloth
+```
+
+### SLO 정의 예시
+```yaml
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: my-service-slo
+  namespace: monitoring
+spec:
+  service: "my-service"
+  labels:
+    team: platform
+  slos:
+    - name: "requests-availability"
+      objective: 99.9
+      description: "99.9% of requests should be successful"
+      sli:
+        events:
+          errorQuery: sum(rate(http_requests_total{job="my-service",code=~"5.."}[{{.window}}]))
+          totalQuery: sum(rate(http_requests_total{job="my-service"}[{{.window}}]))
+      alerting:
+        name: MyServiceHighErrorRate
+        labels:
+          category: "availability"
+        annotations:
+          summary: "High error rate on my-service"
+```
+
+---
+
+## 🔄 통합 사용 시나리오
+
+### 시나리오 1: 마이크로서비스 배포 및 모니터링
+```bash
+# 1. ArgoCD로 애플리케이션 배포
+kubectl apply -f my-app-argocd.yaml
+
+# 2. Istio 활성화
+kubectl label namespace default istio-injection=enabled
+kubectl rollout restart deployment -n default
+
+# 3. ServiceMonitor 생성 (Prometheus)
+kubectl apply -f my-app-servicemonitor.yaml
+
+# 4. Grafana에서 대시보드 확인
+# http://grafana.bocopile.io
+
+# 5. Kiali에서 트래픽 확인
+# http://kiali.bocopile.io
+```
+
+### 시나리오 2: 정책 기반 보안 강화
+```bash
+# 1. Kyverno 정책 적용
+kubectl apply -f addons/values/security/kyverno-policies.yaml
+
+# 2. 정책 위반 확인
+kubectl get policyreport -A
+
+# 3. 정책 준수 확인
+kubectl describe clusterpolicy
+```
+
+### 시나리오 3: 이벤트 기반 오토스케일링
+```bash
+# 1. KEDA ScaledObject 생성
+kubectl apply -f my-scaledobject.yaml
+
+# 2. 스케일링 동작 확인
+kubectl get hpa
+kubectl get scaledobject
+
+# 3. Grafana에서 메트릭 확인
+# 대시보드: KEDA Metrics
+```
+
+---
+
+## 🛠 트러블슈팅
+
+### 로그 확인
+```bash
+# 특정 애드온 로그 확인
+kubectl logs -n monitoring -l app=prometheus
+kubectl logs -n logging -l app=loki
+kubectl logs -n tracing -l app=tempo
+
+# 전체 이벤트 확인
+kubectl get events -A --sort-by='.lastTimestamp'
+```
+
+### 리소스 상태 확인
+```bash
+# 모든 애드온 Pod 상태
+kubectl get pods -A | grep -E "monitoring|logging|tracing|argocd|istio|vault|keda|kyverno|velero"
+
+# PVC 상태 확인
+kubectl get pvc -A
+
+# LoadBalancer IP 확인
+kubectl get svc -A --field-selector spec.type=LoadBalancer
+```
+
+### 재시작
+```bash
+# 특정 애드온 재시작
+kubectl rollout restart deployment -n monitoring kube-prometheus-stack-operator
+kubectl rollout restart deployment -n logging loki
+
+# 전체 애드온 재설치
+cd addons && ./uninstall.sh && ./install.sh
+```

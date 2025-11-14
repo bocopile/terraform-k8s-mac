@@ -81,3 +81,5 @@ logs/
 !logs/.gitkeep
 *.pid
 .claude/
+# Generated files
+*.generated
