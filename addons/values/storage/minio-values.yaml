@@ -49,16 +49,16 @@ service:
   port: 9000
   # Console port for web UI
   consolePort: 9001
-  # Annotations for MetalLB
+  # Annotations for MetalLB (auto-assign from IP pool)
   annotations:
-    metallb.universe.tf/loadBalancerIPs: 192.168.100.240
+    metallb.universe.tf/address-pool: default-address-pool
 
 # Console ingress (optional)
 consoleService:
   type: LoadBalancer
   port: 9001
   annotations:
-    metallb.universe.tf/loadBalancerIPs: 192.168.100.241
+    metallb.universe.tf/address-pool: default-address-pool
 
 # Security context
 securityContext:
@@ -95,12 +95,14 @@ policies:
           DateGreaterThan:
             s3:ExistingObjectTag/retention: "30d"
 
-# Monitoring
+# Monitoring (Prometheus metrics)
 metrics:
   serviceMonitor:
     enabled: true
     interval: 30s
     scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
 
 # Pod annotations
 podAnnotations:
@@ -117,8 +119,8 @@ tolerations: []
 # Affinity rules
 affinity: {}
 
-# Update strategy
-DeploymentUpdate:
+# Update strategy (fixed: deploymentUpdate not DeploymentUpdate)
+deploymentUpdate:
   type: RollingUpdate
   maxUnavailable: 0
   maxSurge: 100%
