@@ -611,3 +611,60 @@ kubectl rollout restart deployment -n logging loki
 # 전체 애드온 재설치
 cd addons && ./uninstall.sh && ./install.sh
 ```
+
+---
+
+## 📖 상세 문서
+
+### 🚀 시작하기
+- [빠른 시작 가이드](docs/QUICKSTART.md) - 5분 안에 클러스터 구축
+- [설정 가이드](docs/SETUP.md) - 상세 설치 및 설정 방법
+
+### 🤖 자동화
+- [워크플로우 가이드](docs/WORKFLOW.md) - Claude Code SubAgent 워크플로우
+- [자동화 요약](docs/AUTOMATION_SUMMARY.md) - 구현된 자동화 기능
+- [MCP 서버 설정](docs/MCP_SETUP.md) - Model Context Protocol 설정
+
+### 📚 애드온 가이드
+
+#### 모니터링 & 로깅
+- [모니터링 (Prometheus + Grafana)](docs/addons/monitoring.md)
+- [로깅 (Loki + Fluent-Bit)](docs/addons/logging.md)
+- [트레이싱 (Tempo + OpenTelemetry)](docs/addons/tracing.md)
+
+#### 오토스케일링 & SLO
+- [KEDA 오토스케일링](docs/addons/keda-guide.md) - 이벤트 기반 Pod 스케일링
+- [Sloth SLO 관리](docs/addons/sloth-guide.md) - Service Level Objective 자동화
+
+#### 보안 & 정책
+- [보안 (Vault + Kyverno)](docs/addons/security.md) - 시크릿 관리 및 정책 엔진
+
+#### GitOps & Service Mesh
+- [GitOps (ArgoCD)](docs/addons/gitops.md) - 선언적 배포 관리
+- [Service Mesh (Istio)](docs/addons/service-mesh.md) - 트래픽 관리 및 보안
+
+#### 스토리지 & 백업
+- [스토리지 (MinIO)](docs/addons/storage.md) - S3 호환 오브젝트 스토리지
+- [백업 (Velero)](docs/addons/velero.md) - Kubernetes 백업 및 복원
+
+### 🔧 테스트 & 트러블슈팅
+- [통합 테스트 결과](docs/testing/addon-integration-test-results.md) - Sprint 1, 2 애드온 테스트
+- [트러블슈팅 가이드](docs/troubleshooting/addons-troubleshooting.md) - 문제 해결 방법
+
+---
+
+## 🌟 주요 특징
+
+- ✅ **완전 자동화**: Terraform으로 인프라 프로비저닝부터 애드온 설치까지
+- ✅ **고가용성**: 3개 Control Plane, 6개 Worker Node 멀티 노드 클러스터
+- ✅ **Observability 스택**: Prometheus, Grafana, Loki, Tempo 완벽 통합
+- ✅ **GitOps**: ArgoCD 기반 선언적 배포 관리
+- ✅ **보안**: Vault + Kyverno 시크릿 및 정책 관리
+- ✅ **확장성**: KEDA 이벤트 기반 오토스케일링, Velero 백업/복원
+- ✅ **Service Mesh**: Istio 트래픽 관리 및 mTLS
+
+---
+
+## 📝 라이센스
+
+이 프로젝트는 개인 학습 및 테스트 목적으로 제공됩니다.
