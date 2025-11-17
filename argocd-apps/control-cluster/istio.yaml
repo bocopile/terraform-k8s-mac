@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: istio-control
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - chart: base
+        version: 1.20.0
+        name: istio-base
+      - chart: istiod
+        version: 1.20.0
+        name: istiod
+      - chart: gateway
+        version: 1.20.0
+        name: istio-ingressgateway
+  template:
+    metadata:
+      name: '{{name}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://istio-release.storage.googleapis.com/charts
+        targetRevision: '{{version}}'
+        chart: '{{chart}}'
+        helm:
+          values: |
+            # Values will be customized per component
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: istio-system
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

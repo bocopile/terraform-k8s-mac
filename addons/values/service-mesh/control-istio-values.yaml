@@ -1,0 +1,175 @@
+# Istio Base for Control Cluster
+# Multi-cluster primary cluster configuration
+
+# Global settings
+global:
+  # Multi-cluster settings
+  multiCluster:
+    clusterName: control-cluster
+    enabled: true
+
+  # Network settings
+  network: control-network
+
+  # Mesh ID (same across all clusters)
+  meshID: terraform-mesh
+
+  # Revision (for canary upgrades)
+  revision: ""
+
+# Pilot (Istiod) settings
+pilot:
+  enabled: true
+
+  # Resources
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1000m
+      memory: 4Gi
+
+  # Autoscaling
+  autoscaleEnabled: true
+  autoscaleMin: 2
+  autoscaleMax: 5
+
+  # Multi-cluster settings
+  env:
+    PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY: "true"
+    PILOT_SKIP_VALIDATE_TRUST_DOMAIN: "true"
+
+  # Service
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.107
+
+# Ingress Gateway
+ingressGateways:
+  - name: istio-ingressgateway
+    enabled: true
+
+    # Service
+    service:
+      type: LoadBalancer
+      loadBalancerIP: 192.168.64.108
+      ports:
+        - name: status-port
+          port: 15021
+          targetPort: 15021
+        - name: http2
+          port: 80
+          targetPort: 8080
+        - name: https
+          port: 443
+          targetPort: 8443
+        - name: tcp-istiod
+          port: 15012
+          targetPort: 15012
+        - name: tls
+          port: 15443
+          targetPort: 15443
+
+    # Resources
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 2000m
+        memory: 1Gi
+
+    # Autoscaling
+    autoscaleEnabled: true
+    autoscaleMin: 2
+    autoscaleMax: 5
+
+# Egress Gateway
+egressGateways:
+  - name: istio-egressgateway
+    enabled: true
+
+    # Resources
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 2000m
+        memory: 1Gi
+
+    # Autoscaling
+    autoscaleEnabled: true
+    autoscaleMin: 1
+    autoscaleMax: 3
+
+# Telemetry
+telemetry:
+  enabled: true
+  v2:
+    enabled: true
+    prometheus:
+      enabled: true
+
+# Tracing
+meshConfig:
+  # Access log settings
+  accessLogFile: /dev/stdout
+  accessLogEncoding: JSON
+
+  # Default config
+  defaultConfig:
+    # Tracing
+    tracing:
+      sampling: 100.0  # 100% sampling for dev/test
+      zipkin:
+        address: otel-collector.tracing.svc.cluster.local:9411
+
+    # Metrics
+    proxyStatsMatcher:
+      inclusionRegexps:
+        - ".*"
+
+  # Enable auto mTLS
+  enableAutoMtls: true
+
+  # Trust domain
+  trustDomain: cluster.local
+
+  # Multi-cluster settings
+  defaultServiceExportTo:
+    - "*"
+
+  # Outbound traffic policy
+  outboundTrafficPolicy:
+    mode: ALLOW_ANY
+
+# CNI
+cni:
+  enabled: false
+
+# Prometheus
+prometheus:
+  enabled: true
+
+# Grafana
+grafana:
+  enabled: false  # Using existing Grafana
+
+# Kiali
+kiali:
+  enabled: true
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.109
+
+# Jaeger
+jaeger:
+  enabled: false  # Using Tempo
+
+# Sidecar injector
+sidecarInjectorWebhook:
+  enabled: true
+  enableNamespacesByDefault: false
+  rewriteAppHTTPProbe: true

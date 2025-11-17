@@ -1,0 +1,131 @@
+# Istio for App Cluster
+# Multi-cluster remote cluster configuration
+
+# Global settings
+global:
+  # Multi-cluster settings
+  multiCluster:
+    clusterName: app-cluster
+    enabled: true
+
+  # Network settings
+  network: app-network
+
+  # Mesh ID (same across all clusters)
+  meshID: terraform-mesh
+
+  # Revision
+  revision: ""
+
+  # Remote pilot address (Control Cluster)
+  remotePilotAddress: 192.168.64.107
+
+# Pilot (Istiod) - disabled on remote cluster
+pilot:
+  enabled: false
+
+# Ingress Gateway
+ingressGateways:
+  - name: istio-ingressgateway
+    enabled: true
+
+    # Service
+    service:
+      type: LoadBalancer
+      loadBalancerIP: 192.168.64.128
+      ports:
+        - name: status-port
+          port: 15021
+          targetPort: 15021
+        - name: http2
+          port: 80
+          targetPort: 8080
+        - name: https
+          port: 443
+          targetPort: 8443
+        - name: tls
+          port: 15443
+          targetPort: 15443
+
+    # Resources
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+
+    # Autoscaling
+    autoscaleEnabled: true
+    autoscaleMin: 2
+    autoscaleMax: 5
+
+# Egress Gateway
+egressGateways:
+  - name: istio-egressgateway
+    enabled: true
+
+    # Resources
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    # Autoscaling
+    autoscaleEnabled: true
+    autoscaleMin: 1
+    autoscaleMax: 3
+
+# Mesh Config
+meshConfig:
+  # Access log
+  accessLogFile: /dev/stdout
+  accessLogEncoding: JSON
+
+  # Default config
+  defaultConfig:
+    # Discover Control Cluster istiod
+    discoveryAddress: 192.168.64.107:15012
+
+    # Tracing
+    tracing:
+      sampling: 100.0
+      zipkin:
+        address: otel-collector.tracing.svc.cluster.local:9411
+
+  # Enable auto mTLS
+  enableAutoMtls: true
+
+  # Trust domain
+  trustDomain: cluster.local
+
+  # Outbound traffic policy
+  outboundTrafficPolicy:
+    mode: ALLOW_ANY
+
+# CNI
+cni:
+  enabled: false
+
+# Disable components not needed on remote cluster
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false
+
+kiali:
+  enabled: false
+
+jaeger:
+  enabled: false
+
+# Sidecar injector
+sidecarInjectorWebhook:
+  enabled: true
+  enableNamespacesByDefault: false
+  rewriteAppHTTPProbe: true
