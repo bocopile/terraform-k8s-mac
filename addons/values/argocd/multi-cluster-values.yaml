@@ -1,0 +1,69 @@
+# ArgoCD Multi-cluster Configuration
+# Control Cluster에 설치되어 App Cluster를 관리
+
+global:
+  domain: argocd.control.local
+
+server:
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.100
+
+  config:
+    # Multi-cluster 지원
+    application.resourceTrackingMethod: annotation
+
+  # RBAC 설정
+  rbacConfig:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      g, admin, role:admin
+
+configs:
+  params:
+    # Application 컨트롤러 설정
+    application.instanceLabelKey: argocd.argoproj.io/instance
+
+  cm:
+    # Multi-cluster 지원
+    application.resourceTrackingMethod: annotation
+
+    # Cluster 등록 시 자동으로 namespace 생성
+    resource.customizations.ignoreDifferences.all: |
+      jqPathExpressions:
+      - '.metadata.resourceVersion'
+      - '.metadata.generation'
+      - '.metadata.managedFields'
+
+applicationSet:
+  enabled: true
+
+controller:
+  replicas: 1
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+repoServer:
+  replicas: 1
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+redis:
+  enabled: true
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Prometheus Operator가 설치되어 있으면 ServiceMonitor 활성화
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
