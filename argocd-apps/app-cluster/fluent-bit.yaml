@@ -1,0 +1,126 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fluent-bit
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 0.39.0
+    chart: fluent-bit
+    helm:
+      values: |
+        image:
+          repository: fluent/fluent-bit
+          tag: 2.1.8
+        kind: DaemonSet
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        service:
+          type: ClusterIP
+        config:
+          inputs: |
+            [INPUT]
+                Name              tail
+                Path              /var/log/containers/*.log
+                multiline.parser  docker, cri
+                Tag               kube.*
+                Mem_Buf_Limit     5MB
+                Skip_Long_Lines   On
+
+            [INPUT]
+                Name              systemd
+                Tag               host.*
+                Systemd_Filter    _SYSTEMD_UNIT=kubelet.service
+                Read_From_Tail    On
+          filters: |
+            [FILTER]
+                Name                kubernetes
+                Match               kube.*
+                Kube_URL            https://kubernetes.default.svc:443
+                Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+                Kube_Tag_Prefix     kube.var.log.containers.
+                Merge_Log           On
+                Keep_Log            Off
+                K8S-Logging.Parser  On
+                K8S-Logging.Exclude On
+                Labels              On
+                Annotations         Off
+
+            [FILTER]
+                Name                nest
+                Match               kube.*
+                Operation           lift
+                Nested_under        kubernetes
+                Add_prefix          kubernetes_
+
+            [FILTER]
+                Name                modify
+                Match               kube.*
+                Add                 cluster app-cluster
+                Add                 environment production
+
+            [FILTER]
+                Name                nest
+                Match               kube.*
+                Operation           nest
+                Wildcard            kubernetes_*
+                Nest_under          kubernetes
+                Remove_prefix       kubernetes_
+          outputs: |
+            [OUTPUT]
+                Name                loki
+                Match               *
+                Host                192.168.64.104
+                Port                3100
+                Labels              job=fluent-bit, cluster=app-cluster
+                Label_keys          $kubernetes['namespace_name'],$kubernetes['pod_name'],$kubernetes['container_name']
+                Line_format         json
+                Auto_kubernetes_labels On
+        volumeMounts:
+          - name: varlog
+            mountPath: /var/log
+            readOnly: true
+          - name: varlibdockercontainers
+            mountPath: /var/lib/docker/containers
+            readOnly: true
+        daemonSetVolumes:
+          - name: varlog
+            hostPath:
+              path: /var/log
+          - name: varlibdockercontainers
+            hostPath:
+              path: /var/lib/docker/containers
+        serviceAccount:
+          create: true
+          annotations: {}
+        rbac:
+          create: true
+          nodeAccess: true
+        podSecurityPolicy:
+          create: false
+        tolerations:
+          - key: node-role.kubernetes.io/master
+            operator: Exists
+            effect: NoSchedule
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+        nodeSelector: {}
+        affinity: {}
+  destination:
+    server: https://app-cluster-api:6443
+    namespace: logging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

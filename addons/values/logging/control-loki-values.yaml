@@ -1,0 +1,125 @@
+# Loki Stack for Control Cluster
+# Central log aggregation hub
+
+loki:
+  enabled: true
+
+  # Persistence
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClassName: standard
+
+  # Configuration
+  config:
+    auth_enabled: false
+
+    ingester:
+      chunk_idle_period: 3m
+      chunk_block_size: 262144
+      chunk_retain_period: 1m
+      max_transfer_retries: 0
+      lifecycler:
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      max_entries_limit_per_query: 5000
+      retention_period: 720h  # 30 days
+
+    schema_config:
+      configs:
+      - from: 2024-01-01
+        store: boltdb-shipper
+        object_store: filesystem
+        schema: v11
+        index:
+          prefix: index_
+          period: 24h
+
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /data/loki/boltdb-shipper-active
+        cache_location: /data/loki/boltdb-shipper-cache
+        cache_ttl: 24h
+        shared_store: filesystem
+      filesystem:
+        directory: /data/loki/chunks
+
+    chunk_store_config:
+      max_look_back_period: 720h  # 30 days
+
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 720h  # 30 days
+
+  # Resources
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  # Service
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.104
+    port: 3100
+
+# Promtail (log collector for Control Cluster itself)
+promtail:
+  enabled: true
+
+  config:
+    clients:
+    - url: http://loki:3100/loki/api/v1/push
+
+    positions:
+      filename: /tmp/positions.yaml
+
+    scrape_configs:
+    # Kubernetes pods
+    - job_name: kubernetes-pods
+      kubernetes_sd_configs:
+      - role: pod
+
+      relabel_configs:
+      # Add cluster label
+      - source_labels: []
+        target_label: cluster
+        replacement: control-cluster
+
+      # Pod name
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+
+      # Namespace
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+
+      # Container name
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container
+
+      # Node name
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+
+# Grafana (reuse existing Grafana or configure separately)
+grafana:
+  enabled: false  # Using existing Grafana from Prometheus stack
+
+# Fluent Bit (disabled, using Promtail for Control Cluster)
+fluent-bit:
+  enabled: false
