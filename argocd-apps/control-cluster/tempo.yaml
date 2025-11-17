@@ -1,0 +1,119 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 1.7.1
+    chart: tempo
+    helm:
+      values: |
+        tempo:
+          persistence:
+            enabled: true
+            size: 30Gi
+            storageClassName: standard
+          config:
+            auth_enabled: false
+            server:
+              http_listen_port: 3200
+              grpc_listen_port: 9096
+            distributor:
+              receivers:
+                otlp:
+                  protocols:
+                    http:
+                      endpoint: 0.0.0.0:4318
+                    grpc:
+                      endpoint: 0.0.0.0:4317
+                jaeger:
+                  protocols:
+                    thrift_http:
+                      endpoint: 0.0.0.0:14268
+                    grpc:
+                      endpoint: 0.0.0.0:14250
+                zipkin:
+                  endpoint: 0.0.0.0:9411
+            ingester:
+              trace_idle_period: 10s
+              max_block_bytes: 1_000_000
+              max_block_duration: 5m
+            compactor:
+              compaction:
+                block_retention: 720h
+            storage:
+              trace:
+                backend: local
+                local:
+                  path: /var/tempo/traces
+                wal:
+                  path: /var/tempo/wal
+                pool:
+                  max_workers: 100
+                  queue_depth: 10000
+            overrides:
+              metrics_generator_processors:
+                - service-graphs
+                - span-metrics
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          service:
+            type: LoadBalancer
+            loadBalancerIP: 192.168.64.105
+        tempoQuery:
+          enabled: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+        serviceMonitor:
+          enabled: true
+          interval: 30s
+        metricsGenerator:
+          enabled: true
+          config:
+            storage:
+              path: /var/tempo/generator/wal
+              remote_write:
+                - url: http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write
+                  send_exemplars: true
+        grafana:
+          enabled: true
+          datasource:
+            enabled: true
+            name: Tempo
+            url: http://tempo:3200
+            type: tempo
+            jsonData:
+              tracesToLogs:
+                datasourceUid: loki
+                mapTagNamesEnabled: true
+                mappedTags:
+                  - key: service.name
+                    value: service
+              tracesToMetrics:
+                datasourceUid: prometheus
+              serviceMap:
+                datasourceUid: prometheus
+              nodeGraph:
+                enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tracing
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

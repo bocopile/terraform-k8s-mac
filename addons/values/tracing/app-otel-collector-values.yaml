@@ -1,0 +1,250 @@
+# OpenTelemetry Collector for App Cluster
+# Collects and forwards traces to Control Cluster Tempo
+
+mode: daemonset
+
+# Image
+image:
+  repository: otel/opentelemetry-collector-k8s
+  tag: 0.88.0
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Service
+service:
+  type: ClusterIP
+  ports:
+    # OTLP gRPC
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      protocol: TCP
+    # OTLP HTTP
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      protocol: TCP
+    # Jaeger gRPC
+    jaeger-grpc:
+      enabled: true
+      containerPort: 14250
+      servicePort: 14250
+      protocol: TCP
+    # Jaeger Thrift HTTP
+    jaeger-thrift:
+      enabled: true
+      containerPort: 14268
+      servicePort: 14268
+      protocol: TCP
+    # Zipkin
+    zipkin:
+      enabled: true
+      containerPort: 9411
+      servicePort: 9411
+      protocol: TCP
+    # Metrics
+    metrics:
+      enabled: true
+      containerPort: 8888
+      servicePort: 8888
+      protocol: TCP
+
+# Configuration
+config:
+  receivers:
+    # OTLP receiver
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+    # Jaeger receiver
+    jaeger:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:14250
+        thrift_http:
+          endpoint: 0.0.0.0:14268
+
+    # Zipkin receiver
+    zipkin:
+      endpoint: 0.0.0.0:9411
+
+    # Kubernetes cluster receiver (for metadata)
+    k8s_cluster:
+      auth_type: serviceAccount
+      node_conditions_to_report:
+        - Ready
+        - MemoryPressure
+      allocatable_types_to_report:
+        - cpu
+        - memory
+
+  processors:
+    # Batch processor (improves performance)
+    batch:
+      timeout: 10s
+      send_batch_size: 1024
+
+    # Memory limiter (prevent OOM)
+    memory_limiter:
+      check_interval: 1s
+      limit_mib: 400
+
+    # Resource processor (add cluster info)
+    resource:
+      attributes:
+        - key: cluster
+          value: app-cluster
+          action: upsert
+        - key: environment
+          value: production
+          action: upsert
+
+    # K8s attributes processor
+    k8sattributes:
+      auth_type: serviceAccount
+      passthrough: false
+      extract:
+        metadata:
+          - k8s.namespace.name
+          - k8s.deployment.name
+          - k8s.statefulset.name
+          - k8s.daemonset.name
+          - k8s.cronjob.name
+          - k8s.job.name
+          - k8s.node.name
+          - k8s.pod.name
+          - k8s.pod.uid
+          - k8s.pod.start_time
+        labels:
+          - tag_name: app
+            key: app.kubernetes.io/name
+            from: pod
+          - tag_name: version
+            key: app.kubernetes.io/version
+            from: pod
+
+  exporters:
+    # Export to Tempo on Control Cluster
+    otlp:
+      endpoint: 192.168.64.105:4317
+      tls:
+        insecure: true
+      sending_queue:
+        num_consumers: 10
+        queue_size: 1000
+      retry_on_failure:
+        enabled: true
+        initial_interval: 5s
+        max_interval: 30s
+        max_elapsed_time: 300s
+
+    # Logging exporter (for debugging)
+    # logging:
+    #   loglevel: debug
+
+  service:
+    telemetry:
+      logs:
+        level: info
+      metrics:
+        address: 0.0.0.0:8888
+
+    pipelines:
+      traces:
+        receivers:
+          - otlp
+          - jaeger
+          - zipkin
+        processors:
+          - memory_limiter
+          - k8sattributes
+          - resource
+          - batch
+        exporters:
+          - otlp
+          # - logging
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+
+# RBAC
+rbac:
+  create: true
+
+# Cluster Role for k8s metadata
+clusterRole:
+  create: true
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - events
+        - namespaces
+        - namespaces/status
+        - nodes
+        - nodes/spec
+        - pods
+        - pods/status
+        - replicationcontrollers
+        - replicationcontrollers/status
+        - resourcequotas
+        - services
+      verbs:
+        - get
+        - list
+        - watch
+    - apiGroups:
+        - apps
+      resources:
+        - daemonsets
+        - deployments
+        - replicasets
+        - statefulsets
+      verbs:
+        - get
+        - list
+        - watch
+    - apiGroups:
+        - batch
+      resources:
+        - jobs
+        - cronjobs
+      verbs:
+        - get
+        - list
+        - watch
+
+# Tolerations (run on all nodes)
+tolerations:
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+# Node Selector
+nodeSelector: {}
+
+# Affinity
+affinity: {}
+
+# Pod Security Context
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0

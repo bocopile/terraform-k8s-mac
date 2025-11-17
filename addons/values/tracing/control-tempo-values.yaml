@@ -1,0 +1,124 @@
+# Tempo for Control Cluster
+# Central distributed tracing backend
+
+tempo:
+  # Persistence
+  persistence:
+    enabled: true
+    size: 30Gi
+    storageClassName: standard
+
+  # Configuration
+  config:
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3200
+      grpc_listen_port: 9096
+
+    distributor:
+      receivers:
+        # OTLP (OpenTelemetry Protocol)
+        otlp:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4318
+            grpc:
+              endpoint: 0.0.0.0:4317
+        # Jaeger
+        jaeger:
+          protocols:
+            thrift_http:
+              endpoint: 0.0.0.0:14268
+            grpc:
+              endpoint: 0.0.0.0:14250
+        # Zipkin
+        zipkin:
+          endpoint: 0.0.0.0:9411
+
+    ingester:
+      trace_idle_period: 10s
+      max_block_bytes: 1_000_000
+      max_block_duration: 5m
+
+    compactor:
+      compaction:
+        block_retention: 720h  # 30 days
+
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+        pool:
+          max_workers: 100
+          queue_depth: 10000
+
+    overrides:
+      metrics_generator_processors:
+        - service-graphs
+        - span-metrics
+
+  # Resources
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  # Service
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.105
+
+# Tempo Query (UI for searching traces)
+tempoQuery:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Service Monitor for Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+
+# Metrics Generator (generates metrics from traces)
+metricsGenerator:
+  enabled: true
+  config:
+    storage:
+      path: /var/tempo/generator/wal
+      remote_write:
+        - url: http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write
+          send_exemplars: true
+
+# Grafana datasource
+grafana:
+  enabled: true
+  datasource:
+    enabled: true
+    name: Tempo
+    url: http://tempo:3200
+    type: tempo
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        mapTagNamesEnabled: true
+        mappedTags:
+          - key: service.name
+            value: service
+      tracesToMetrics:
+        datasourceUid: prometheus
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
