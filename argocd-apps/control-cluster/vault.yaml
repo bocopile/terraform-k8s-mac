@@ -1,0 +1,164 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    targetRevision: 0.27.0
+    chart: vault
+    helm:
+      valuesObject:
+        global:
+          enabled: true
+          tlsDisable: false
+        injector:
+          enabled: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          replicas: 2
+          webhook:
+            failurePolicy: Ignore
+            timeoutSeconds: 30
+        server:
+          enabled: true
+          image:
+            repository: hashicorp/vault
+            tag: 1.15.2
+            pullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          readinessProbe:
+            enabled: true
+            path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+          livenessProbe:
+            enabled: true
+            path: /v1/sys/health?standbyok=true
+            initialDelaySeconds: 60
+          updateStrategyType: RollingUpdate
+          service:
+            enabled: true
+            type: LoadBalancer
+            loadBalancerIP: 192.168.64.106
+            port: 8200
+            targetPort: 8200
+            annotations: {}
+          dataStorage:
+            enabled: true
+            size: 10Gi
+            storageClass: standard
+            accessMode: ReadWriteOnce
+          auditStorage:
+            enabled: true
+            size: 5Gi
+            storageClass: standard
+            accessMode: ReadWriteOnce
+          ha:
+            enabled: true
+            replicas: 3
+            raft:
+              enabled: true
+              setNodeId: true
+              config: |
+                ui = true
+
+                listener "tcp" {
+                  tls_disable = 1
+                  address = "[::]:8200"
+                  cluster_address = "[::]:8201"
+                  telemetry {
+                    unauthenticated_metrics_access = true
+                  }
+                }
+
+                storage "raft" {
+                  path = "/vault/data"
+                  retry_join {
+                    leader_api_addr = "http://vault-0.vault-internal:8200"
+                  }
+                  retry_join {
+                    leader_api_addr = "http://vault-1.vault-internal:8200"
+                  }
+                  retry_join {
+                    leader_api_addr = "http://vault-2.vault-internal:8200"
+                  }
+                }
+
+                service_registration "kubernetes" {}
+
+                telemetry {
+                  prometheus_retention_time = "30s"
+                  disable_hostname = true
+                }
+          standalone:
+            enabled: false
+          serviceAccount:
+            create: true
+            name: vault
+          podDisruptionBudget:
+            maxUnavailable: 1
+          affinity: |
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: vault
+                      app.kubernetes.io/instance: vault
+                      component: server
+                  topologyKey: kubernetes.io/hostname
+        ui:
+          enabled: true
+          serviceType: LoadBalancer
+          serviceNodePort: null
+          externalPort: 8200
+        serverTelemetry:
+          serviceMonitor:
+            enabled: true
+            interval: 30s
+          prometheusRules:
+            enabled: true
+            rules:
+              - alert: VaultSealed
+                expr: vault_core_unsealed == 0
+                for: 5m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "Vault is sealed"
+                  description: "Vault has been sealed for more than 5 minutes"
+              - alert: VaultDown
+                expr: up{job="vault"} == 0
+                for: 5m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "Vault is down"
+                  description: "Vault has been down for more than 5 minutes"
+              - alert: VaultLeadershipLoss
+                expr: changes(vault_core_active[5m]) > 0
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Vault leadership changed"
+                  description: "Vault leadership has changed in the last 5 minutes"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

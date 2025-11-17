@@ -1,0 +1,86 @@
+# Vault Agent Injector for App Cluster
+# Connects to Control Cluster Vault for secrets injection
+
+global:
+  enabled: true
+  tlsDisable: false
+
+  # External Vault server on Control Cluster
+  externalVaultAddr: "http://192.168.64.106:8200"
+
+injector:
+  enabled: true
+
+  # Injector is the only component needed on App Cluster
+  # It will inject Vault Agent sidecar into pods
+
+  # Resources
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Replica count
+  replicas: 2
+
+  # Webhook configuration
+  webhook:
+    failurePolicy: Ignore
+    timeoutSeconds: 30
+
+  # External Vault address
+  externalVaultAddr: "http://192.168.64.106:8200"
+
+  # Agent image
+  agentImage:
+    repository: hashicorp/vault
+    tag: 1.15.2
+
+  # Default agent configuration
+  agentDefaults:
+    cpuLimit: "500m"
+    cpuRequest: "250m"
+    memLimit: "256Mi"
+    memRequest: "128Mi"
+    template: "map"
+
+  # Metrics
+  metrics:
+    enabled: true
+
+  # Service account
+  serviceAccount:
+    create: true
+    name: vault-agent-injector
+
+  # Pod annotations
+  annotations: {}
+
+  # Extra environment variables
+  extraEnvironmentVars:
+    AGENT_INJECT_VAULT_ADDR: "http://192.168.64.106:8200"
+    AGENT_INJECT_VAULT_AUTH_PATH: "auth/kubernetes-app"
+
+  # Affinity (spread across nodes)
+  affinity: |
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vault-agent-injector
+                app.kubernetes.io/instance: vault
+                component: webhook
+            topologyKey: kubernetes.io/hostname
+
+server:
+  # Disable Vault server on App Cluster
+  enabled: false
+
+ui:
+  # UI not needed on App Cluster
+  enabled: false

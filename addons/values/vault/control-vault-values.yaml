@@ -1,0 +1,194 @@
+# HashiCorp Vault for Control Cluster
+# Central secrets management system
+
+global:
+  enabled: true
+  tlsDisable: false  # Enable TLS in production
+
+injector:
+  enabled: true
+
+  # Resources for injector
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Replica count
+  replicas: 2
+
+  # Webhook configuration
+  webhook:
+    failurePolicy: Ignore
+    timeoutSeconds: 30
+
+server:
+  enabled: true
+
+  # Enterprise license (if available)
+  # enterpriseLicense:
+  #   secretName: vault-license
+  #   secretKey: license
+
+  # Image
+  image:
+    repository: hashicorp/vault
+    tag: 1.15.2
+    pullPolicy: IfNotPresent
+
+  # Resources
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Readiness probe
+  readinessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+
+  # Liveness probe
+  livenessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true
+    initialDelaySeconds: 60
+
+  # Update strategy
+  updateStrategyType: RollingUpdate
+
+  # Service
+  service:
+    enabled: true
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.106
+    port: 8200
+    targetPort: 8200
+    annotations: {}
+
+  # Data storage
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+    accessMode: ReadWriteOnce
+
+  # Audit storage
+  auditStorage:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+    accessMode: ReadWriteOnce
+
+  # HA mode
+  ha:
+    enabled: true
+    replicas: 3
+
+    # Raft storage backend
+    raft:
+      enabled: true
+      setNodeId: true
+
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          telemetry {
+            unauthenticated_metrics_access = true
+          }
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+          retry_join {
+            leader_api_addr = "http://vault-0.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://vault-1.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://vault-2.vault-internal:8200"
+          }
+        }
+
+        service_registration "kubernetes" {}
+
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname = true
+        }
+
+  # Standalone config (not used when HA is enabled)
+  standalone:
+    enabled: false
+
+  # Service account
+  serviceAccount:
+    create: true
+    name: vault
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    maxUnavailable: 1
+
+  # Affinity (spread across nodes)
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              app.kubernetes.io/instance: vault
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+# UI
+ui:
+  enabled: true
+  serviceType: LoadBalancer
+  serviceNodePort: null
+  externalPort: 8200
+
+# Server monitoring
+serverTelemetry:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+  prometheusRules:
+    enabled: true
+    rules:
+      - alert: VaultSealed
+        expr: vault_core_unsealed == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Vault is sealed"
+          description: "Vault has been sealed for more than 5 minutes"
+
+      - alert: VaultDown
+        expr: up{job="vault"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Vault is down"
+          description: "Vault has been down for more than 5 minutes"
+
+      - alert: VaultLeadershipLoss
+        expr: changes(vault_core_active[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Vault leadership changed"
+          description: "Vault leadership has changed in the last 5 minutes"
