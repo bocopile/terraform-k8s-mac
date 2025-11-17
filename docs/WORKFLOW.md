@@ -47,13 +47,13 @@ graph TD
 #### 1.1 명령 입력
 ```bash
 # 개발 사이클 시작
-/finops dev FINOPS-350
+/terraform dev TERRAFORM-350
 
 # 체크포인트 재개
-/finops resume FINOPS-350
+/terraform resume TERRAFORM-350
 
 # 처음부터 재시작
-/finops restart FINOPS-350
+/terraform restart TERRAFORM-350
 ```
 
 #### 1.2 JIRA 티켓 확인/생성
@@ -65,7 +65,7 @@ def get_or_create_jira_ticket(ticket_id):
     if not ticket:
         # 백로그 자동 생성
         ticket = jira_client.create_issue({
-            'project': 'FINOPS',
+            'project': 'TERRAFORM',
             'summary': '자동 생성 백로그',
             'type': 'Task',
             'status': '준비'
@@ -84,34 +84,34 @@ def get_or_create_jira_ticket(ticket_id):
 #### 1.3 Git 브랜치 전략
 **브랜치 구조:**
 ```
-grafana (메인 브랜치 - 운영)
-  └── grafana-stage (스테이징 브랜치)
-        └── feature/FINOPS-{number} (각 백로그별 작업 브랜치)
+main (메인 브랜치 - 운영)
+  └── stage (스테이징 브랜치)
+        └── feature/TERRAFORM-{number} (각 백로그별 작업 브랜치)
 ```
 
 **브랜치 생성:**
 ```bash
-# 1. grafana-stage에서 분기
-git checkout grafana-stage
-git pull origin grafana-stage
+# 1. stage에서 분기
+git checkout stage
+git pull origin stage
 
 # 2. JIRA 티켓 번호 기반 브랜치 생성
-git checkout -b feature/FINOPS-350
+git checkout -b feature/TERRAFORM-350
 
 # 브랜치 이름 규칙
-feature/FINOPS-{number}   # 신규 기능
-bugfix/FINOPS-{number}    # 버그 수정
-hotfix/FINOPS-{number}    # 긴급 수정
-refactor/FINOPS-{number}  # 리팩토링
+feature/TERRAFORM-{number}   # 신규 기능
+bugfix/TERRAFORM-{number}    # 버그 수정
+hotfix/TERRAFORM-{number}    # 긴급 수정
+refactor/TERRAFORM-{number}  # 리팩토링
 ```
 
 **PR 전략:**
 ```bash
-# Step 1: 작업 브랜치 → grafana-stage PR
-feature/FINOPS-350 → grafana-stage
+# Step 1: 작업 브랜치 → stage PR
+feature/TERRAFORM-350 → stage
 
-# Step 2: 스테이징 검증 완료 후 → grafana PR (수동)
-grafana-stage → grafana
+# Step 2: 스테이징 검증 완료 후 → main PR (수동)
+stage → main
 ```
 
 ---

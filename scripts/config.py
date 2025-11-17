@@ -49,8 +49,8 @@ class Config:
         # ===================================
         self.git_author_name = os.getenv('GIT_AUTHOR_NAME', 'Claude Code')
         self.git_author_email = os.getenv('GIT_AUTHOR_EMAIL', 'claude@company.com')
-        self.git_main_branch = os.getenv('GIT_MAIN_BRANCH', 'grafana')
-        self.git_stage_branch = os.getenv('GIT_STAGE_BRANCH', 'grafana-stage')
+        self.git_main_branch = os.getenv('GIT_MAIN_BRANCH', 'main')
+        self.git_stage_branch = os.getenv('GIT_STAGE_BRANCH', 'stage')
 
         # ===================================
         # Redis 설정
