@@ -1,0 +1,23 @@
+# MetalLB Configuration for App Cluster
+# IP Pool: 192.168.64.120-140
+# Purpose: LoadBalancer for App Cluster workload services
+
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: app-cluster-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.64.120-192.168.64.140
+  autoAssign: true
+
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: app-cluster-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - app-cluster-pool

@@ -1,0 +1,344 @@
+# Claude Code 워크플로우 설정
+# 이 파일은 워크플로우의 템플릿과 설정을 정의합니다.
+
+version: "1.0.0"
+last_updated: "2025-11-17"
+
+# ===================================
+# Jira 설정
+# ===================================
+jira:
+  # Jira 인스턴스 정보
+  cloud_id: "3101fb28-6338-4c53-9ea3-05553ea20a35"
+  project_key: "TERRAFORM"
+  board_id: 67
+
+  # 상태 전환 (Transition)
+  transitions:
+    start: "진행 중"
+    complete: "완료"
+    block: "차단됨"
+    reopen: "다시 열기"
+
+  # Jira 댓글 템플릿
+  comment_templates:
+    # 작업 시작 시
+    start: |
+      🚀 작업을 시작합니다.
+      브랜치: {branch_name}
+      담당: Claude Code
+
+    # 주요 진행 상황
+    progress: |
+      ✅ {milestone}
+
+    # 커밋 완료 시
+    commit: |
+      📝 커밋 완료: {commit_hash}
+      {changes}
+
+    # Notion 문서 작성 완료 시
+    notion: |
+      📚 Notion 문서 작성 완료
+      {notion_url}
+
+    # Stage 브랜치 merge 시
+    merge: |
+      🔀 stage 브랜치에 merge 완료
+      커밋: {commit_hash}
+
+    # 테스트 완료 시
+    test_success: |
+      ✅ 테스트 완료
+      {test_results}
+
+    # 테스트 실패 시
+    test_failure: |
+      ⚠️ 테스트 실패
+      문제: {issue}
+      조치: {action}
+
+    # 블로커 발견 시
+    blocker: |
+      ⚠️ 블로커 발견
+      상세: {details}
+      영향: {impact}
+
+    # 작업 일시 중단
+    pause: |
+      ⏸️ 작업 일시 중단
+      사유: {reason}
+
+    # 작업 재개
+    resume: |
+      ▶️ 작업 재개
+      중단 시간: {pause_duration}
+
+    # 작업 완료 시 (최종)
+    complete: |
+      🎉 작업 완료
+
+      ## 산출물
+      - 커밋: {commit_hash}
+      - 문서: {notion_url}
+      - 브랜치: {branch_name}
+
+      ## 테스트 결과
+      {test_summary}
+
+      ## 주요 변경사항
+      {changes_summary}
+
+# ===================================
+# Git 설정
+# ===================================
+git:
+  # 메인 브랜치
+  main_branch: "main"
+  stage_branch: "stage"
+
+  # 브랜치 네이밍
+  branch_prefix: "feature/terraform-"
+  hotfix_prefix: "hotfix/"
+
+  # 커밋 메시지 템플릿
+  commit_template: |
+    [{issue_key}] {description}
+
+    {details}
+
+    🤖 Generated with Claude Code
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+  # 커밋 메시지 규칙
+  commit_rules:
+    max_subject_length: 72
+    require_issue_key: true
+    require_signature: true
+
+# ===================================
+# Notion 설정
+# ===================================
+notion:
+  # 부모 페이지 ID (terraform-for-mac)
+  parent_page_id: "2aef5ceac30980d8af63f6d2b2ceaeb3"
+
+  # 문서 제목 템플릿
+  title_template: "[{issue_key}] {issue_summary}"
+
+  # 문서 내용 템플릿
+  content_template: |
+    # {issue_summary}
+
+    ## 📋 개요
+
+    **Jira 이슈**: [{issue_key}](https://gjrjr4545.atlassian.net/browse/{issue_key})
+    **상태**: {status}
+    **우선순위**: {priority}
+    **스프린트**: {sprint}
+
+    ## 🎯 목적
+
+    {description}
+
+    ## 🔧 작업 내용
+
+    ### 주요 변경사항
+
+    {changes}
+
+    ### 기술적 결정 사항
+
+    {technical_decisions}
+
+    ## 📊 결과
+
+    ### 산출물
+
+    {deliverables}
+
+    ### 테스트 결과
+
+    {test_results}
+
+    ## 🔗 참고 링크
+
+    - Git 커밋: {commit_url}
+    - 브랜치: {branch_name}
+
+    ## 📝 참고사항
+
+    {notes}
+
+  # 문서 구조 (카테고리별)
+  categories:
+    infrastructure: "🏗️ 인프라"
+    network: "🌐 네트워크"
+    service: "⚙️ 서비스"
+    deployment: "🚀 배포"
+    documentation: "📚 문서"
+    testing: "✅ 테스트"
+
+# ===================================
+# TodoWrite 설정
+# ===================================
+todo:
+  # 태스크 상태
+  states:
+    - pending
+    - in_progress
+    - completed
+
+  # 태스크 분해 가이드
+  task_breakdown_guide:
+    - "각 태스크는 1-2시간 내 완료 가능해야 함"
+    - "명확하고 실행 가능한 동작으로 작성"
+    - "의존성이 있는 태스크는 순서대로 배치"
+    - "테스트 태스크 별도 작성"
+
+# ===================================
+# 테스트 설정
+# ===================================
+testing:
+  # 테스트 단계
+  stages:
+    - unit: "단위 테스트"
+    - integration: "통합 테스트"
+    - e2e: "E2E 테스트"
+    - regression: "회귀 테스트"
+
+  # 필수 테스트 (이슈 타입별)
+  required_tests:
+    infrastructure:
+      - "terraform validate"
+      - "terraform plan"
+    deployment:
+      - "배포 스크립트 실행"
+      - "서비스 헬스 체크"
+    service:
+      - "서비스 기동 확인"
+      - "API 테스트"
+
+# ===================================
+# 품질 체크리스트
+# ===================================
+quality:
+  # 코드 품질
+  code:
+    - "코드 리뷰 자가 점검"
+    - "보안 취약점 확인"
+    - "성능 영향 검토"
+    - "에러 핸들링 적절성"
+
+  # 문서 품질
+  documentation:
+    - "Notion 문서 완성도"
+    - "링크 정확성"
+    - "예제 코드 정확성"
+    - "스크린샷/다이어그램 포함"
+
+  # 프로세스 준수
+  process:
+    - "모든 워크플로우 단계 완료"
+    - "Jira 댓글 히스토리 명확"
+    - "Git 이력 깔끔"
+    - "테스트 통과"
+
+# ===================================
+# 알림 설정 (선택)
+# ===================================
+notifications:
+  slack:
+    enabled: true
+    webhook_url_env: "SLACK_WEBHOOK_URL"
+    channel: "#개발"
+
+    # 알림 발송 시점
+    events:
+      - issue_started
+      - issue_completed
+      - blocker_found
+      - test_failed
+
+    # 알림 템플릿
+    templates:
+      issue_started: |
+        🚀 *작업 시작*
+        이슈: {issue_key} - {issue_summary}
+        담당: Claude Code
+
+      issue_completed: |
+        🎉 *작업 완료*
+        이슈: {issue_key} - {issue_summary}
+        문서: {notion_url}
+
+      blocker_found: |
+        ⚠️ *블로커 발견*
+        이슈: {issue_key}
+        상세: {details}
+
+# ===================================
+# 예외 상황 처리
+# ===================================
+exceptions:
+  # 블로커 처리
+  blocker:
+    actions:
+      - "Jira 댓글로 즉시 기록"
+      - "상태는 '진행 중' 유지 또는 '차단됨'으로 변경"
+      - "팀에 알림 (Slack 등)"
+      - "해결 방안 모색 및 기록"
+
+  # 작업 범위 변경
+  scope_change:
+    actions:
+      - "Jira 댓글로 변경 사유 기록"
+      - "이슈 설명 업데이트"
+      - "TodoWrite 재조정"
+      - "예상 시간 재산정"
+
+  # 긴급 작업 (Hotfix)
+  hotfix:
+    branch_prefix: "hotfix/"
+    workflow:
+      - "현재 작업 일시 중단 (Jira 댓글)"
+      - "hotfix 브랜치 생성"
+      - "긴급 작업 완료"
+      - "main 직접 merge"
+      - "원래 작업 재개 (Jira 댓글)"
+
+# ===================================
+# 스프린트별 설정
+# ===================================
+sprints:
+  sprint_1:
+    name: "Sprint 1 - Infra & Network"
+    id: 303
+    focus: "기초 인프라 및 네트워크"
+
+  sprint_2:
+    name: "Sprint 2 - Services"
+    id: 304
+    focus: "중앙화된 서비스"
+
+  sprint_3:
+    name: "Sprint 3 - Deploy & Docs"
+    id: 305
+    focus: "배포 자동화 및 문서화"
+
+# ===================================
+# 환경별 설정
+# ===================================
+environments:
+  development:
+    branch: "stage"
+    auto_deploy: false
+
+  staging:
+    branch: "stage"
+    auto_deploy: true
+
+  production:
+    branch: "main"
+    auto_deploy: false
+    require_approval: true

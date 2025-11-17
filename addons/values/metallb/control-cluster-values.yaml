@@ -1,0 +1,23 @@
+# MetalLB Configuration for Control Cluster
+# IP Pool: 192.168.64.100-110
+# Purpose: LoadBalancer for Control Cluster services (ArgoCD, Prometheus, Grafana, Vault, etc.)
+
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: control-cluster-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.64.100-192.168.64.110
+  autoAssign: true
+
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: control-cluster-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - control-cluster-pool
