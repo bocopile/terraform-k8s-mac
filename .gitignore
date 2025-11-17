@@ -80,6 +80,6 @@ checkpoints/
 logs/
 !logs/.gitkeep
 *.pid
-.claude/
+#.claude/
 # Generated files
 *.generated
