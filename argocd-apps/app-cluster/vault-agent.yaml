@@ -1,0 +1,73 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-agent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    targetRevision: 0.27.0
+    chart: vault
+    helm:
+      valuesObject:
+        global:
+          enabled: true
+          tlsDisable: false
+          externalVaultAddr: "http://192.168.64.106:8200"
+        injector:
+          enabled: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          replicas: 2
+          webhook:
+            failurePolicy: Ignore
+            timeoutSeconds: 30
+          externalVaultAddr: "http://192.168.64.106:8200"
+          agentImage:
+            repository: hashicorp/vault
+            tag: 1.15.2
+          agentDefaults:
+            cpuLimit: "500m"
+            cpuRequest: "250m"
+            memLimit: "256Mi"
+            memRequest: "128Mi"
+            template: "map"
+          metrics:
+            enabled: true
+          serviceAccount:
+            create: true
+            name: vault-agent-injector
+          annotations: {}
+          extraEnvironmentVars:
+            AGENT_INJECT_VAULT_ADDR: "http://192.168.64.106:8200"
+            AGENT_INJECT_VAULT_AUTH_PATH: "auth/kubernetes-app"
+          affinity: |
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: vault-agent-injector
+                        app.kubernetes.io/instance: vault
+                        component: webhook
+                    topologyKey: kubernetes.io/hostname
+        server:
+          enabled: false
+        ui:
+          enabled: false
+  destination:
+    server: https://app-cluster-api:6443
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
