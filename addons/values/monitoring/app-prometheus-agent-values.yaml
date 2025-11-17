@@ -1,0 +1,61 @@
+# Prometheus Agent for App Cluster
+# Remote Write mode - sends metrics to Control Cluster
+
+prometheus:
+  prometheusSpec:
+    # Agent mode (no local storage, only remote write)
+    image:
+      tag: v2.47.0
+
+    # Remote Write to Control Cluster
+    remoteWrite:
+    - url: http://192.168.64.101:9090/api/v1/write
+      remoteTimeout: 30s
+      queueConfig:
+        capacity: 10000
+        maxShards: 200
+        minShards: 1
+        maxSamplesPerSend: 5000
+        batchSendDeadline: 5s
+        minBackoff: 30ms
+        maxBackoff: 100ms
+
+    # Resources (lighter than full Prometheus)
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+    # No persistence in agent mode
+    storageSpec: {}
+
+    # Service Discovery
+    serviceMonitorSelector: {}
+    podMonitorSelector: {}
+
+    # External labels for federation
+    externalLabels:
+      cluster: app-cluster
+      environment: production
+
+  service:
+    type: ClusterIP
+
+# Disable Grafana (use Control Cluster)
+grafana:
+  enabled: false
+
+# Disable AlertManager (use Control Cluster)
+alertmanager:
+  enabled: false
+
+# Node Exporter
+prometheus-node-exporter:
+  enabled: true
+
+# Kube State Metrics
+kube-state-metrics:
+  enabled: true

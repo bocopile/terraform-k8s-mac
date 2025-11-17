@@ -1,0 +1,122 @@
+# Prometheus Stack for Control Cluster
+# Central monitoring hub with federation support
+
+prometheus:
+  prometheusSpec:
+    # Persistence
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+    # Retention
+    retention: 30d
+    retentionSize: 45GB
+
+    # Resources
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+    # Remote Write (for long-term storage)
+    # remoteWrite:
+    # - url: http://thanos-receive:19291/api/v1/receive
+
+    # Federation endpoint
+    enableRemoteWriteReceiver: true
+
+    # Service Discovery
+    serviceMonitorSelector: {}
+    podMonitorSelector: {}
+
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.101
+
+grafana:
+  enabled: true
+
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.102
+
+  adminPassword: admin123
+
+  persistence:
+    enabled: true
+    size: 10Gi
+
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-operated:9090
+        access: proxy
+        isDefault: true
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+  dashboards:
+    default:
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      node-exporter:
+        gnetId: 1860
+        revision: 27
+        datasource: Prometheus
+      pod-monitoring:
+        gnetId: 6417
+        revision: 1
+        datasource: Prometheus
+
+alertmanager:
+  enabled: true
+
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'default'
+
+    receivers:
+    - name: 'default'
+      # Add Slack, PagerDuty, etc.
+
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.64.103
+
+# Node Exporter
+prometheus-node-exporter:
+  enabled: true
+
+# Kube State Metrics
+kube-state-metrics:
+  enabled: true
