@@ -9,6 +9,108 @@ spec:
     repoURL: https://kedacore.github.io/charts
     targetRevision: 2.12.1
     chart: keda
+    helm:
+      valuesObject:
+        image:
+          keda:
+            repository: ghcr.io/kedacore/keda
+            tag: 2.12.1
+          metricsApiServer:
+            repository: ghcr.io/kedacore/keda-metrics-apiserver
+            tag: 2.12.1
+          webhooks:
+            repository: ghcr.io/kedacore/keda-admission-webhooks
+            tag: 2.12.1
+        resources:
+          operator:
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          metricServer:
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          webhooks:
+            limits:
+              cpu: 50m
+              memory: 100Mi
+            requests:
+              cpu: 10m
+              memory: 10Mi
+        prometheus:
+          metricServer:
+            enabled: true
+            port: 9022
+            serviceMonitor:
+              enabled: true
+              interval: 30s
+          operator:
+            enabled: true
+            port: 8080
+            serviceMonitor:
+              enabled: true
+              interval: 30s
+          webhooks:
+            enabled: true
+            port: 8080
+            serviceMonitor:
+              enabled: true
+              interval: 30s
+        podSecurityContext:
+          operator:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          metricServer:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          webhooks:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+        securityContext:
+          operator:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          metricServer:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          webhooks:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+        logging:
+          operator:
+            level: info
+            format: console
+          metricServer:
+            level: 0
+        webhooks:
+          enabled: true
+          port: 9443
+          failurePolicy: Ignore
+        podDisruptionBudget:
+          operator:
+            minAvailable: 1
+          metricServer:
+            minAvailable: 1
+          webhooks:
+            minAvailable: 1
   destination:
     server: https://app-cluster-api:6443
     namespace: keda

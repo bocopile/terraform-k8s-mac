@@ -1,0 +1,205 @@
+# Kyverno Policy Engine for App Cluster
+# Kubernetes native policy management
+
+# Replica count
+replicaCount: 3
+
+# Image
+image:
+  repository: ghcr.io/kyverno/kyverno
+  tag: v1.11.0
+  pullPolicy: IfNotPresent
+
+# Init image
+initImage:
+  repository: ghcr.io/kyverno/kyvernopre
+  tag: v1.11.0
+  pullPolicy: IfNotPresent
+
+# Resources
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Service
+service:
+  type: ClusterIP
+  port: 443
+
+# Metrics
+metricsService:
+  type: ClusterIP
+  port: 8000
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+
+# Service Monitor
+serviceMonitor:
+  enabled: true
+  interval: 30s
+
+# RBAC
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    name: kyverno
+
+# Pod Security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  privileged: false
+
+# Admission Controller
+admissionController:
+  replicas: 3
+
+  # Webhook configurations
+  webhooks:
+    - name: mutating-webhook
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+          - kube-system
+          - kyverno
+    - name: validating-webhook
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+          - kube-system
+          - kyverno
+
+# Background Controller
+backgroundController:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Cleanup Controller
+cleanupController:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Reports Controller
+reportsController:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Config
+config:
+  # Resource filters
+  resourceFilters:
+  - '[Event,*,*]'
+  - '[*,kube-system,*]'
+  - '[*,kube-public,*]'
+  - '[*,kube-node-lease,*]'
+  - '[Node,*,*]'
+  - '[APIService,*,*]'
+  - '[TokenReview,*,*]'
+  - '[SubjectAccessReview,*,*]'
+  - '[SelfSubjectAccessReview,*,*]'
+  - '[Binding,*,*]'
+  - '[ReplicaSet,*,*]'
+  - '[AdmissionReport,*,*]'
+  - '[ClusterAdmissionReport,*,*]'
+  - '[BackgroundScanReport,*,*]'
+  - '[ClusterBackgroundScanReport,*,*]'
+
+  # Webhook timeout
+  webhookTimeout: 10
+
+  # Generate success events
+  generateSuccessEvents: false
+
+# Features
+features:
+  # Enable policy reports
+  policyReports:
+    enabled: true
+
+  # Enable admission reports
+  admissionReports:
+    enabled: true
+
+  # Enable background scanning
+  backgroundScan:
+    enabled: true
+    interval: 1h
+
+  # Enable TTL
+  ttl:
+    enabled: true
+
+# CRDs
+crds:
+  install: true
+  annotations: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  minAvailable: 1
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - kyverno
+        topologyKey: kubernetes.io/hostname
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Logging
+logging:
+  format: text
+  verbosity: 2

@@ -1,0 +1,149 @@
+# KEDA (Kubernetes Event Driven Autoscaling) for App Cluster
+# Event-driven autoscaling for workloads
+
+image:
+  keda:
+    repository: ghcr.io/kedacore/keda
+    tag: 2.12.1
+  metricsApiServer:
+    repository: ghcr.io/kedacore/keda-metrics-apiserver
+    tag: 2.12.1
+  webhooks:
+    repository: ghcr.io/kedacore/keda-admission-webhooks
+    tag: 2.12.1
+
+# Resources
+resources:
+  operator:
+    limits:
+      cpu: 1000m
+      memory: 1000Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  metricServer:
+    limits:
+      cpu: 1000m
+      memory: 1000Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  webhooks:
+    limits:
+      cpu: 50m
+      memory: 100Mi
+    requests:
+      cpu: 10m
+      memory: 10Mi
+
+# Prometheus metrics
+prometheus:
+  metricServer:
+    enabled: true
+    port: 9022
+    portName: metrics
+    path: /metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  operator:
+    enabled: true
+    port: 8080
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  webhooks:
+    enabled: true
+    port: 8080
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+
+# Service Account
+serviceAccount:
+  operator:
+    create: true
+    name: keda-operator
+    annotations: {}
+  metricServer:
+    create: true
+    name: keda-metrics-server
+  webhooks:
+    create: true
+    name: keda-admission-webhooks
+
+# Pod Security
+podSecurityContext:
+  operator:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  metricServer:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  webhooks:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+securityContext:
+  operator:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  metricServer:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  webhooks:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Logging
+logging:
+  operator:
+    level: info
+    format: console
+    timeEncoding: rfc3339
+  metricServer:
+    level: 0
+
+# Webhooks
+webhooks:
+  enabled: true
+  port: 9443
+  failurePolicy: Ignore
+
+# RBAC
+rbac:
+  create: true
+  aggregateToDefaultRoles: false
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  operator:
+    minAvailable: 1
+  metricServer:
+    minAvailable: 1
+  webhooks:
+    minAvailable: 1
+
+# Affinity
+affinity:
+  operator: {}
+  metricServer: {}
+  webhooks: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
