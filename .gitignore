@@ -8,6 +8,10 @@ terraform.tfstate.backup
 .terraform/
 .terraform.lock.hcl
 
+# Test environment tfvars (not committed to Git)
+*.test.tfvars
+terraform.test.tfvars
+
 # Local kubeconfig
 kubeconfig
 kubeconfig.*
