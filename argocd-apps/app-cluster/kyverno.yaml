@@ -1,0 +1,145 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kyverno.github.io/kyverno
+    targetRevision: 3.1.0
+    chart: kyverno
+    helm:
+      valuesObject:
+        replicaCount: 3
+        image:
+          repository: ghcr.io/kyverno/kyverno
+          tag: v1.11.0
+          pullPolicy: IfNotPresent
+        initImage:
+          repository: ghcr.io/kyverno/kyvernopre
+          tag: v1.11.0
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        service:
+          type: ClusterIP
+          port: 443
+        metricsService:
+          type: ClusterIP
+          port: 8000
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8000"
+        serviceMonitor:
+          enabled: true
+          interval: 30s
+        rbac:
+          create: true
+          serviceAccount:
+            create: true
+            name: kyverno
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+        admissionController:
+          replicas: 3
+        backgroundController:
+          enabled: true
+          replicas: 2
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        cleanupController:
+          enabled: true
+          replicas: 2
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        reportsController:
+          enabled: true
+          replicas: 2
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        config:
+          resourceFilters:
+          - '[Event,*,*]'
+          - '[*,kube-system,*]'
+          - '[*,kube-public,*]'
+          - '[*,kube-node-lease,*]'
+          - '[Node,*,*]'
+          - '[APIService,*,*]'
+          - '[TokenReview,*,*]'
+          - '[SubjectAccessReview,*,*]'
+          - '[SelfSubjectAccessReview,*,*]'
+          - '[Binding,*,*]'
+          - '[ReplicaSet,*,*]'
+          - '[AdmissionReport,*,*]'
+          - '[ClusterAdmissionReport,*,*]'
+          - '[BackgroundScanReport,*,*]'
+          - '[ClusterBackgroundScanReport,*,*]'
+          webhookTimeout: 10
+          generateSuccessEvents: false
+        features:
+          policyReports:
+            enabled: true
+          admissionReports:
+            enabled: true
+          backgroundScan:
+            enabled: true
+            interval: 1h
+          ttl:
+            enabled: true
+        crds:
+          install: true
+        podDisruptionBudget:
+          minAvailable: 1
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                    - kyverno
+                topologyKey: kubernetes.io/hostname
+        logging:
+          format: text
+          verbosity: 2
+  destination:
+    server: https://app-cluster-api:6443
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
