@@ -1,0 +1,136 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-agent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 54.2.2
+    chart: kube-prometheus-stack
+    helm:
+      valuesObject:
+        prometheus:
+          prometheusSpec:
+            # Agent mode (no local storage, only remote write)
+            image:
+              repository: quay.io/prometheus/prometheus
+              tag: v2.47.0
+            # Remote Write to Control Cluster
+            remoteWrite:
+            - url: http://192.168.64.101:9090/api/v1/write
+              remoteTimeout: 30s
+              queueConfig:
+                capacity: 10000
+                maxShards: 200
+                minShards: 1
+                maxSamplesPerSend: 5000
+                batchSendDeadline: 5s
+                minBackoff: 30ms
+                maxBackoff: 100ms
+            # Resources (lighter than full Prometheus)
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 1Gi
+            # No persistence in agent mode
+            storageSpec: {}
+            # Service Discovery
+            serviceMonitorSelector: {}
+            serviceMonitorNamespaceSelector: {}
+            podMonitorSelector: {}
+            podMonitorNamespaceSelector: {}
+            # External labels for federation
+            externalLabels:
+              cluster: app-cluster
+              environment: production
+            # Security context
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+              fsGroup: 2000
+          service:
+            type: ClusterIP
+            port: 9090
+        # Disable Grafana (use Control Cluster)
+        grafana:
+          enabled: false
+        # Disable AlertManager (use Control Cluster)
+        alertmanager:
+          enabled: false
+        # Node Exporter - collects node-level metrics
+        prometheus-node-exporter:
+          enabled: true
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 64Mi
+          tolerations:
+          - operator: Exists
+        # Kube State Metrics - collects cluster-level metrics
+        kube-state-metrics:
+          enabled: true
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        # Prometheus Operator
+        prometheusOperator:
+          enabled: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          # ServiceMonitor for operator itself
+          serviceMonitor:
+            enabled: true
+        # Default ServiceMonitors
+        defaultRules:
+          create: true
+          rules:
+            alertmanager: false  # Disabled
+            etcd: false
+            configReloaders: true
+            general: true
+            k8s: true
+            kubeApiserverAvailability: true
+            kubeApiserverSlos: true
+            kubeControllerManager: false
+            kubelet: true
+            kubeProxy: false
+            kubePrometheusGeneral: true
+            kubePrometheusNodeRecording: true
+            kubernetesApps: true
+            kubernetesResources: true
+            kubernetesStorage: true
+            kubernetesSystem: true
+            kubeScheduler: false
+            kubeStateMetrics: true
+            network: true
+            node: true
+            nodeExporterAlerting: true
+            nodeExporterRecording: true
+            prometheus: true
+            prometheusOperator: true
+  destination:
+    server: https://app-cluster-api:6443
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
