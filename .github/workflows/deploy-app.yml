@@ -1,0 +1,361 @@
+name: Deploy App Cluster
+
+on:
+  push:
+    branches:
+      - main
+      - stage
+    paths:
+      - 'argocd-apps/app-cluster/**'
+      - 'addons/values/logging/app-**'
+      - 'addons/values/tracing/app-**'
+      - 'addons/values/monitoring/app-**'
+      - 'addons/values/vault/app-**'
+      - 'addons/values/service-mesh/app-**'
+      - 'addons/values/workload/**'
+      - '.github/workflows/deploy-app.yml'
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Application to deploy (or "all" for all apps)'
+        required: false
+        default: 'all'
+      sync_mode:
+        description: 'Sync mode'
+        required: false
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - sync
+          - diff
+
+env:
+  ARGOCD_VERSION: v2.9.3
+  KUBECTL_VERSION: v1.28.4
+
+jobs:
+  deploy:
+    name: Deploy to App Cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Setup ArgoCD CLI
+        run: |
+          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/${{ env.ARGOCD_VERSION }}/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/argocd
+          argocd version --client
+
+      - name: Configure kubeconfig (Control Cluster)
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_CONTROL }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+          kubectl config use-context control-cluster
+
+      - name: Verify Control Cluster connectivity
+        run: |
+          echo "Checking Control Cluster connectivity..."
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Login to ArgoCD
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+        run: |
+          echo "Logging in to ArgoCD..."
+          argocd login $ARGOCD_SERVER \
+            --auth-token $ARGOCD_AUTH_TOKEN \
+            --grpc-web \
+            --insecure
+
+      - name: Verify App Cluster registration
+        run: |
+          echo "Checking App Cluster registration..."
+          argocd cluster list
+          if argocd cluster list | grep -q "app-cluster"; then
+            echo "✓ App Cluster is registered"
+          else
+            echo "✗ App Cluster is not registered"
+            exit 1
+          fi
+
+      - name: Apply ArgoCD Applications
+        run: |
+          echo "Applying App Cluster ArgoCD Applications..."
+
+          APPS=(
+            "argocd-apps/app-cluster/fluent-bit.yaml"
+            "argocd-apps/app-cluster/otel-collector.yaml"
+            "argocd-apps/app-cluster/prometheus-agent.yaml"
+            "argocd-apps/app-cluster/vault-agent.yaml"
+            "argocd-apps/app-cluster/istio.yaml"
+            "argocd-apps/app-cluster/keda.yaml"
+            "argocd-apps/app-cluster/kyverno.yaml"
+          )
+
+          for app in "${APPS[@]}"; do
+            if [[ -f "$app" ]]; then
+              echo "Applying $app..."
+              kubectl apply -f "$app"
+            else
+              echo "Warning: $app not found"
+            fi
+          done
+
+      - name: Sync ArgoCD Applications
+        if: github.event.inputs.sync_mode != 'apply'
+        env:
+          APP_NAME: ${{ github.event.inputs.app_name || 'all' }}
+          SYNC_MODE: ${{ github.event.inputs.sync_mode || 'sync' }}
+        run: |
+          if [[ "$APP_NAME" == "all" ]]; then
+            APPS=("fluent-bit" "otel-collector" "prometheus-agent" "vault-agent" "istio" "keda" "kyverno")
+          else
+            APPS=("$APP_NAME")
+          fi
+
+          for app in "${APPS[@]}"; do
+            echo "Syncing $app..."
+
+            if [[ "$SYNC_MODE" == "sync" ]]; then
+              argocd app sync "$app" \
+                --prune \
+                --timeout 600
+            elif [[ "$SYNC_MODE" == "diff" ]]; then
+              argocd app diff "$app"
+            fi
+          done
+
+      - name: Wait for applications to be healthy
+        if: github.event.inputs.sync_mode != 'diff'
+        run: |
+          echo "Waiting for applications to be healthy..."
+
+          APPS=("fluent-bit" "otel-collector" "prometheus-agent" "vault-agent" "istio" "keda" "kyverno")
+
+          for app in "${APPS[@]}"; do
+            echo "Waiting for $app..."
+            argocd app wait "$app" \
+              --health \
+              --timeout 600 \
+              --grpc-web || echo "Warning: $app did not become healthy"
+          done
+
+      - name: Verify App Cluster pods
+        run: |
+          echo "Verifying App Cluster pods..."
+
+          # Configure kubectl for App Cluster
+          echo "${{ secrets.KUBECONFIG_APP }}" | base64 -d > $HOME/.kube/config-app
+          export KUBECONFIG=$HOME/.kube/config-app
+
+          kubectl get pods -n logging
+          kubectl get pods -n tracing
+          kubectl get pods -n monitoring
+          kubectl get pods -n keda
+          kubectl get pods -n kyverno
+
+      - name: Check observability data flow
+        run: |
+          echo "Checking observability data flow..."
+
+          # Switch back to Control Cluster
+          kubectl config use-context control-cluster
+
+          # Check if Control Cluster is receiving data from App Cluster
+          echo "Checking Loki for app-cluster logs..."
+          kubectl exec -n loki loki-0 -- wget -O- --post-data='{"query": "{cluster=\"app-cluster\"}"}' \
+            http://localhost:3100/loki/api/v1/query 2>/dev/null | jq '.data.result | length' || echo "No logs yet"
+
+          echo "Checking Prometheus for app-cluster metrics..."
+          kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 -- wget -O- \
+            'http://localhost:9090/api/v1/query?query=up{cluster="app-cluster"}' 2>/dev/null | jq '.data.result | length' || echo "No metrics yet"
+
+      - name: Get application status
+        if: always()
+        id: app_status
+        run: |
+          echo "Application Status:"
+          argocd app list -o wide
+
+          # Get detailed status for Slack notification
+          STATUS=$(argocd app list -o json | jq -r '.[] | select(.metadata.name | IN("fluent-bit", "otel-collector", "prometheus-agent", "vault-agent", "istio", "keda", "kyverno")) | "\(.metadata.name): \(.status.health.status) / \(.status.sync.status)"')
+          echo "$STATUS"
+
+          # Save for Slack notification
+          echo "APP_STATUS<<EOF" >> $GITHUB_OUTPUT
+          echo "$STATUS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification (Success)
+        if: success()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "✅ App Cluster Deployment Successful",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ App Cluster Deployment Successful"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.event.head_commit.url }}|${{ github.sha }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Application Status:*\n```${{ steps.app_status.outputs.APP_STATUS }}```"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Observability:*\n• Logs → Loki (192.168.64.104)\n• Traces → Tempo (192.168.64.105)\n• Metrics → Prometheus (192.168.64.101)"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Commit Message:*\n${{ github.event.head_commit.message }}"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View ArgoCD"
+                      },
+                      "url": "https://argocd.bocopile.io"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Grafana"
+                      },
+                      "url": "https://grafana.bocopile.io"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send Slack notification (Failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "❌ App Cluster Deployment Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ App Cluster Deployment Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.event.head_commit.url }}|${{ github.sha }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Commit Message:*\n${{ github.event.head_commit.message }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ Deployment failed. Please check the workflow run for details."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
