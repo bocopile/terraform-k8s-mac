@@ -89,3 +89,11 @@ logs/
 *.generated
 
 .claude/**
+
+# Python virtual environment
+.venv/
+venv/
+*.pyc
+__pycache__/
+.worktrees/**
+.orchestrator/**
